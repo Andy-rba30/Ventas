@@ -3,13 +3,13 @@ import sqlite3
 
 import pytest
 
-from agro.db import BaseDatos
 
-
-def test_pragmas_y_log_en_archivo(db_archivo, tmp_path):
+def test_pragmas_y_log_en_archivo(db_archivo):
+    from agro.registro import log
     assert db_archivo.cursor.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     assert db_archivo.cursor.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-    assert (tmp_path / "app.log").exists()
+    # el logger se configura una sola vez por proceso: basta con que escriba a un app.log
+    assert any(getattr(h, "baseFilename", "").endswith("app.log") for h in log.handlers)
 
 
 def test_registros_por_defecto(db):
@@ -52,31 +52,10 @@ def test_excepcion_en_anidada_revierte_todo(db):
     assert db.contactos.encargadas() == ["Administradora"]
 
 
-def _crear_bd_esquema_viejo(ruta):
-    c = sqlite3.connect(ruta)
-    c.execute("CREATE TABLE productos (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE, precio REAL, stock REAL)")
-    c.execute("CREATE TABLE transacciones (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, hora TEXT, tipo TEXT, "
-              "producto TEXT, cantidad REAL, total_dinero REAL, encargada TEXT, stock_resultante REAL)")
-    c.execute("INSERT INTO productos (nombre, precio, stock) VALUES ('CAL', 10, 4)")
-    c.execute("INSERT INTO transacciones (fecha, hora, tipo, producto, cantidad, total_dinero, encargada, stock_resultante) "
-              "VALUES ('2025-01-05', '10:00:00', 'VENTA', 'CAL', 1, 10, 'Administradora', 4)")
-    c.commit(); c.close()
-
-
-def test_migracion_desde_esquema_viejo(tmp_path):
-    ruta = str(tmp_path / "vieja.db")
-    _crear_bd_esquema_viejo(ruta)
-    db = BaseDatos(ruta)
-    try:
-        assert {"cliente", "estado", "proveedor", "ref_id"} <= db.columnas_de("transacciones")
-        assert "precio_compra" in db.columnas_de("productos")
-        assert db.productos.obtener("CAL").precio_compra == 0.0
-        assert db.cursor.execute("SELECT cliente, estado, ref_id FROM transacciones").fetchone() == (None, None, None)
-        assert "Administradora" in db.contactos.encargadas() and "PÚBLICO GENERAL" in db.contactos.nombres("cliente")
-    finally:
-        db.cerrar()
-    # segunda apertura: la migración es idempotente
-    BaseDatos(ruta).cerrar()
+def test_introspeccion(db):
+    assert db.version_esquema() == 1
+    assert db.tabla_existe("boletas") and not db.tabla_existe("transacciones")
+    assert {"id", "nombre", "unidad", "precio_venta", "stock_minimo", "activo"} <= db.columnas_de("productos")
 
 
 def test_respaldo_consistente_con_wal(db_archivo, tmp_path):
