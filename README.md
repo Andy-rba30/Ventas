@@ -28,6 +28,7 @@ python main.py
 - `agro/ui/`: ventana principal, diálogos y una pantalla por archivo.
 - `tests/`: pruebas pytest de datos y servicios con SQLite en memoria (`pip install -r requirements-dev.txt && pytest`).
 - `scripts/prueba_carrito.py`: prueba de la interfaz sin pantalla (`xvfb-run -a python scripts/prueba_carrito.py`).
+- `scripts/generar_datos_prueba.py`: crea una BD de prueba con miles de boletas para medir rendimiento (nunca la real).
 
 Ambas corren en GitHub Actions en cada push (Python 3.11 y 3.12).
 

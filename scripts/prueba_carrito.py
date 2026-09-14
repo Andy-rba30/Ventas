@@ -224,10 +224,10 @@ def t_borrar_operacion_ui():
     reportes.cambiar_mes(-1); app.update(); assert "Sin movimientos" in reportes.lbl_movimientos.cget("text")
     reportes.ir_a_hoy(); app.update(); assert reportes.lbl_movimientos.cget("text").startswith("5 movimiento")  # venta, fiado, 2 pagos, compra
     # exportar el periodo filtrado a dos hojas
-    import pandas as pd
+    from openpyxl import load_workbook
     ruta = os.path.join(workdir, "export.xlsx")
     assert app.reportes.exportar_excel(ruta, reportes.anio, reportes.mes, **reportes.filtros())
-    assert list(pd.read_excel(ruta, sheet_name=None)) == ["Boletas", "Lineas"]
+    assert load_workbook(ruta, read_only=True).sheetnames == ["Boletas", "Lineas"]
     def fila_tipo(tipo):
         for iid in reportes.tabla_mensual.iids():
             if str(reportes.tabla_mensual.valores(iid)["tipo"]).startswith(tipo): return iid

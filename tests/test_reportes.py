@@ -4,6 +4,18 @@ from agro.servicios.reportes import BoletaReporte, Reporte
 from tests.conftest import carrito
 
 
+def leer_excel(ruta):
+    """{hoja: [dict por fila]} leído con openpyxl."""
+    from openpyxl import load_workbook
+    wb = load_workbook(ruta, read_only=True)
+    hojas = {}
+    for ws in wb.worksheets:
+        filas = list(ws.iter_rows(values_only=True))
+        cab = list(filas[0])
+        hojas[ws.title] = [dict(zip(cab, f)) for f in filas[1:]]
+    return hojas
+
+
 @pytest.fixture
 def con_movimientos(con_datos, ops):
     """Septiembre 2026: venta contado (día 2), compra (día 4), fiado a JUAN (día 6), y una venta en agosto."""
@@ -132,22 +144,21 @@ def test_movimientos_traen_unidad_y_stock_actual(con_movimientos, reportes):
 
 
 def test_exportar_excel_filtrado_dos_hojas(con_movimientos, ops, reportes, tmp_path):
-    import pandas as pd
     ops.cobrar_fiado(con_movimientos.boletas.deudas_pendientes()[0].id, "Rosa", monto=20, fecha="2026-09-20")
     ruta = tmp_path / "sep.xlsx"
     assert reportes.exportar_excel(str(ruta), 2026, 9)
-    hojas = pd.read_excel(ruta, sheet_name=None)
+    hojas = leer_excel(ruta)
     assert list(hojas) == ["Boletas", "Lineas"]
-    assert hojas["Boletas"]["Tipo"].tolist() == ["COBRO_DEUDA", "FIADO", "ENTRADA", "VENTA"]   # más reciente primero
-    assert len(hojas["Lineas"]) == 5 and set(hojas["Lineas"].columns) >= {"Producto", "Cantidad", "Subtotal (S/.)", "Ref boleta"}
+    assert [f["Tipo"] for f in hojas["Boletas"]] == ["COBRO_DEUDA", "FIADO", "ENTRADA", "VENTA"]   # más reciente primero
+    assert len(hojas["Lineas"]) == 5 and set(hojas["Lineas"][0]) >= {"Producto", "Cantidad", "Subtotal (S/.)", "Ref boleta"}
     # solo agosto
     assert reportes.exportar_excel(str(tmp_path / "ago.xlsx"), 2026, 8)
-    assert pd.read_excel(tmp_path / "ago.xlsx", sheet_name="Boletas")["Tipo"].tolist() == ["VENTA"]
+    assert [f["Tipo"] for f in leer_excel(tmp_path / "ago.xlsx")["Boletas"]] == ["VENTA"]
     # filtro sin resultados
     assert reportes.exportar_excel(str(tmp_path / "nada.xlsx"), 2025, 1) is False and not (tmp_path / "nada.xlsx").exists()
     # sin periodo: todo (agosto + septiembre)
     assert reportes.exportar_excel(str(tmp_path / "todo.xlsx"))
-    assert len(pd.read_excel(tmp_path / "todo.xlsx", sheet_name="Boletas")) == 5
+    assert len(leer_excel(tmp_path / "todo.xlsx")["Boletas"]) == 5
 
 
 def test_cabeceras_en_negrita_y_anchos(con_movimientos, reportes, tmp_path):

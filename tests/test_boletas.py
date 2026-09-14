@@ -111,12 +111,20 @@ def test_eliminar_entrada_resta_stock(con_datos):
     assert con_datos.productos.obtener("UREA").stock == 5
 
 
-def test_dataframes(con_datos, fiado):
+def test_consultas_de_reportes_por_periodo(con_datos, fiado):
+    from agro.db import Filtro
     con_datos.boletas.registrar_pago(fiado, 60, _ids(con_datos)["admin"], fecha="2026-09-10")
-    bol, lin, pag = con_datos.boletas.boletas_dataframe(), con_datos.boletas.lineas_dataframe(), con_datos.boletas.pagos_dataframe()
-    assert bol.iloc[0][["tipo", "cliente", "total", "pagado", "estado"]].tolist() == ["FIADO", "JUAN", 360, 60, "PARCIAL"]
-    assert lin.iloc[0][["producto", "cantidad", "subtotal", "cliente"]].tolist() == ["UREA", 3, 360, "JUAN"]
-    assert pag.iloc[0][["monto", "cliente", "encargada"]].tolist() == [60, "JUAN", "Administradora"]
+    f = Filtro(2026, 9)
+    assert (f.desde, f.hasta) == ("2026-09-01", "2026-09-30") and Filtro(2026, 9, dia=4).hasta == "2026-09-04"
+    boletas = con_datos.reportes.boletas_periodo(f)
+    assert [(b.tipo, b.cliente, b.total, b.pagado, b.estado, len(b.lineas)) for b in boletas] == [("FIADO", "JUAN", 360, 60, "PARCIAL", 1)]
+    assert boletas[0].lineas[0].producto == "UREA"
+    pagos = con_datos.reportes.pagos_periodo(f)
+    assert [(p.monto, p.cliente, p.encargada) for p in pagos] == [(60, "JUAN", "Administradora")]
+    assert con_datos.reportes.totales_por_tipo(f) == {"FIADO": (360, 300)}
+    assert con_datos.reportes.total_pagos(f) == 60 and con_datos.reportes.total_pagos(Filtro(2026, 8)) == 0
+    assert con_datos.reportes.meses_con_datos() == [(2026, 9)]
+    assert con_datos.reportes.ventas_del_dia("2026-09-03") == (360, 1) and con_datos.reportes.ventas_del_dia("2026-01-01") == (0, 0)
 
 
 # --- contactos con historial ------------------------------------------------

@@ -38,11 +38,16 @@ agro/db/                   SQLite. BaseDatos = Conexion + repositorios
                            eliminar_boleta/linea/pago con reversión de stock)
    contactos.py            db.contactos.*  (dataclass Contacto con notas; obtener/modificar;
                            clientes, proveedores y encargadas con historial se desactivan)
-agro/servicios/            lógica de negocio sin Tk
+   reportes.py             db.reportes.*   consultas agregadas por Filtro(anio, mes, dia, cliente,
+                           proveedor, tipo): totales_por_tipo, total_pagos, costo_vendido,
+                           movimiento_por_producto, boletas_periodo, pagos_periodo, meses_con_datos
+agro/servicios/            lógica de negocio sin Tk (sin pandas ni matplotlib en todo el paquete)
    formato.py              moneda(), cantidad(), parse_cantidad(), MESES
    carrito.py              Carrito / LineaCarrito
    operaciones.py          ServicioOperaciones: venta, fiado, compra, cobro, eliminar
-   reportes.py             ServicioReportes: Reporte por periodo (pandas por ahora)
+   reportes.py             ServicioReportes: Reporte por periodo sobre db.reportes, resumen_inicio,
+                           exportar_excel (delegado a exportar.py)
+   exportar.py             Excel con openpyxl (se importa solo al exportar)
 agro/ui/tema.py            tokens: COLOR (semánticos), ESPACIO, fuente(nombre),
                            aplicar_estilo_treeview(modo) para claro/oscuro
 agro/ui/componentes.py     Tabla (Treeview+scroll, filas dict, arbol=True), Columna,
@@ -106,11 +111,12 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas (rediseño de interfaz terminado: tokens,
-componentes, sidebar, Ajustes, atajos, Ventas/Compras unificadas, Inventario y Contactos en
-maestro-detalle, esquema v2, Fiados por cliente con pagos parciales, Reportes en dos pestañas,
-Inicio completo; matplotlib ya no se usa). Siguiente: Prompt 5.1 (reportes en SQL y arranque sin
-pandas).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas; 5.1 hecho (reportes en SQL, sin pandas ni
+matplotlib; `tests/test_arranque.py` vigila que no vuelvan). Siguiente: Prompt 5.2 (costo promedio,
+historial de precios, respaldo automático, boleta imprimible).
+
+Rendimiento (BD de 20 000 líneas de `scripts/generar_datos_prueba.py`): importar `agro.ui.app`
+665 ms -> 152 ms; `ServicioReportes.generar` de un mes 545 ms -> 24 ms; `resumen_inicio` 31 -> 4 ms.
 
 Nota para pruebas de UI headless: una ventana `withdraw()` no recibe teclas sintéticas
 (`event_generate` de F-keys, Supr, KeyRelease); para probar atajos hay que `deiconify()` +

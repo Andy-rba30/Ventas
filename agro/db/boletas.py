@@ -3,8 +3,6 @@ import datetime
 import sqlite3
 from dataclasses import dataclass, field
 
-import pandas as pd
-
 from agro.registro import log
 
 # Códigos que devuelven eliminar_boleta / eliminar_linea / eliminar_pago
@@ -65,6 +63,7 @@ class Pago:
     monto: float
     encargada: str
     notas: str
+    cliente: str = ""   # lo rellenan las consultas que unen con clientes
 
 
 @dataclass
@@ -293,38 +292,3 @@ class RepositorioBoletas:
 
     def pagado_de(self, boleta_id):
         return float(self.cx.cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM pagos WHERE boleta_id=?", (boleta_id,)).fetchone()[0])
-
-    # --- extracción para reportes (pandas; la Fase 5 lo pasa a SQL agregado) ---
-    def boletas_dataframe(self):
-        return pd.read_sql_query("""
-            SELECT b.id, b.fecha, b.hora, b.tipo, b.total, b.estado, b.notas,
-                   COALESCE(c.nombre, '') AS cliente, COALESCE(p.nombre, '') AS proveedor, e.nombre AS encargada,
-                   COALESCE((SELECT SUM(monto) FROM pagos WHERE boleta_id = b.id), 0) AS pagado
-            FROM boletas b
-            LEFT JOIN clientes c ON c.id = b.cliente_id
-            LEFT JOIN proveedores p ON p.id = b.proveedor_id
-            JOIN encargadas e ON e.id = b.encargada_id
-        """, self.cx.conn)
-
-    def lineas_dataframe(self):
-        return pd.read_sql_query("""
-            SELECT l.id, l.boleta_id, b.fecha, b.hora, b.tipo, p.nombre AS producto, p.unidad, l.cantidad, l.precio_unit,
-                   l.subtotal, l.stock_resultante, p.precio_compra AS costo_unit_actual, p.stock AS stock_actual,
-                   COALESCE(c.nombre, '') AS cliente, COALESCE(pr.nombre, '') AS proveedor,
-                   e.nombre AS encargada, b.estado
-            FROM boleta_lineas l
-            JOIN boletas b ON b.id = l.boleta_id
-            JOIN productos p ON p.id = l.producto_id
-            LEFT JOIN clientes c ON c.id = b.cliente_id
-            LEFT JOIN proveedores pr ON pr.id = b.proveedor_id
-            JOIN encargadas e ON e.id = b.encargada_id
-        """, self.cx.conn)
-
-    def pagos_dataframe(self):
-        return pd.read_sql_query("""
-            SELECT g.id, g.boleta_id, g.fecha, g.hora, g.monto, g.notas, e.nombre AS encargada, COALESCE(c.nombre, '') AS cliente
-            FROM pagos g
-            JOIN boletas b ON b.id = g.boleta_id
-            LEFT JOIN clientes c ON c.id = b.cliente_id
-            JOIN encargadas e ON e.id = g.encargada_id
-        """, self.cx.conn)

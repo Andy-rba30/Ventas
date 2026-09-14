@@ -96,8 +96,16 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅ · 4.6 ✅.
-> **Fases 0 a 4 completas.** Siguiente: 5.1. El 4.6 dejó Reportes con selector de mes,
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅ · 4.6 ✅ · 5.1 ✅.
+> **Fases 0 a 4 completas; Fase 5 en curso.** Siguiente: 5.2.
+>
+> Resultado del 5.1 (BD de 20 000 líneas, 6 694 boletas, generada con
+> `scripts/generar_datos_prueba.py`): importar la app pasó de 665 ms a 152 ms (pandas
+> solo pesaba 466 ms); el reporte de un mes pasó de 545 ms a 24 ms (mediana de 5
+> corridas) y el resumen de Inicio de 31 ms a 4 ms, con resultados idénticos. pandas y
+> matplotlib salieron de `requirements.txt`; Excel se escribe con openpyxl en
+> `servicios/exportar.py`. Las consultas viven en `agro/db/reportes.py`
+> (`RepositorioReportes` + `Filtro`); el servicio solo arma dataclasses. El 4.6 dejó Reportes con selector de mes,
 > botón Hoy y filtros plegables (día, cliente, proveedor, tipo) que consultan al cambiar;
 > pestaña Resumen (ingresos, compras, margen bruto = vendido − cantidad × precio_compra
 > actual, por cobrar total con subtexto del periodo, barra caja y movimiento por producto

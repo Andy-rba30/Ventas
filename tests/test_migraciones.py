@@ -83,13 +83,13 @@ def test_productos_conservan_id_y_faltante_se_crea_inactivo(migrada):
 
 def test_boletas_agrupadas(migrada):
     db, _ = migrada
-    bol = db.boletas.boletas_dataframe().sort_values("id")  # se crean en orden cronológico
-    assert bol["fecha"].tolist() == ["2026-08-01", "2026-09-02", "2026-09-04", "2026-09-06", "2026-09-12"]
-    assert bol["tipo"].tolist() == ["VENTA", "VENTA", "ENTRADA", "FIADO", "FIADO"]
-    venta = db.boletas.obtener(int(bol.iloc[1]["id"]))
+    bol = db.cursor.execute("SELECT id, fecha, tipo FROM boletas ORDER BY id").fetchall()  # se crean en orden cronológico
+    assert [b[1] for b in bol] == ["2026-08-01", "2026-09-02", "2026-09-04", "2026-09-06", "2026-09-12"]
+    assert [b[2] for b in bol] == ["VENTA", "VENTA", "ENTRADA", "FIADO", "FIADO"]
+    venta = db.boletas.obtener(bol[1][0])
     assert venta.total == 330 and len(venta.lineas) == 2 and venta.cliente == "PÚBLICO GENERAL"
     assert [(l.producto, l.cantidad, l.precio_unit, l.stock_resultante) for l in venta.lineas] == [("UREA", 2, 120, 8), ("FOSFATO", 1, 90, 4)]
-    entrada = db.boletas.obtener(int(bol.iloc[2]["id"]))
+    entrada = db.boletas.obtener(bol[2][0])
     assert entrada.proveedor == "AGROSUR" and entrada.encargada == "Rosa" and entrada.total == 1900
 
 

@@ -12,8 +12,9 @@ from agro.db.boletas import Boleta, LineaBoleta, Pago, RepositorioBoletas
 from agro.db.conexion import Conexion
 from agro.db.contactos import RepositorioContactos
 from agro.db.productos import Producto, RepositorioProductos
+from agro.db.reportes import Filtro, RepositorioReportes
 
-__all__ = ["BaseDatos", "Producto", "Boleta", "LineaBoleta", "Pago"]
+__all__ = ["BaseDatos", "Producto", "Boleta", "LineaBoleta", "Pago", "Filtro"]
 
 
 class BaseDatos(Conexion):
@@ -22,3 +23,4 @@ class BaseDatos(Conexion):
         self.productos = RepositorioProductos(self)
         self.boletas = RepositorioBoletas(self)
         self.contactos = RepositorioContactos(self)
+        self.reportes = RepositorioReportes(self)

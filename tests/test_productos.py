@@ -40,7 +40,7 @@ def test_renombrar_conserva_id_e_historial(con_datos, ops):
     assert db.productos.obtener("UREA") is None
     p = db.productos.obtener("UREA GRANULADA")
     assert p.id == id_urea and p.precio_venta == 130
-    assert db.boletas.lineas_dataframe()["producto"].tolist() == ["UREA GRANULADA"]
+    assert [l.producto for l in db.boletas.obtener(1).lineas] == ["UREA GRANULADA"]
 
 
 def test_renombrar_a_nombre_existente_falla_sin_cambios(con_datos):
