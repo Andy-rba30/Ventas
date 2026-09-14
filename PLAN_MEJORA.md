@@ -96,9 +96,12 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 1.1 ✅ hecho (commit "fix: crash al agregar al carrito y
-> doble disparo al editar celdas"). Verificación automatizada en
-> `scripts/prueba_carrito.py`. Siguiente: Prompt 1.2.
+> **Estado:** Prompt 0.1 ✅ · Prompt 1.1 ✅ · Prompt 1.2 ✅.
+> Verificación automatizada en `scripts/prueba_carrito.py` (UI, con Xvfb) y
+> `scripts/prueba_bd.py` (capa de datos). Fase 1 completa. Siguiente: Prompt 2.1.
+>
+> Nota para 2.2: los dos scripts anteriores ya cubren gran parte de los casos
+> pedidos; el prompt debe convertirlos a pytest, no reescribirlos.
 
 ### Prompt 1.1 – Crash al agregar al carrito y edición de celdas
 

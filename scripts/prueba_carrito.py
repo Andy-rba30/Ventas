@@ -121,6 +121,55 @@ def t_finalizar_venta():
     app.procesar_boleta("VENTA"); app.update()
     assert app.carrito_ventas == [] and app.db.obtener_producto("UREA")["stock"] == 10 - 4 - 1 + 4 - 4  # ver detalle abajo
 
+def t_finalizar_venta_y_fiado():
+    app.vaciar_carrito("ventas")
+    app.producto_sel["ventas"] = app.db.obtener_producto("UREA")
+    app.ent_cantidad_ventas.delete(0, tk.END); app.ent_cantidad_ventas.insert(0, "2"); app.agregar_al_carrito_ventas()
+    app.procesar_boleta("VENTA"); app.update()
+    assert app.carrito_ventas == [] and app.db.obtener_producto("UREA")["stock"] == 8
+    # fiado a PÚBLICO GENERAL se rechaza y el carrito se conserva
+    app.ent_cantidad_ventas.insert(0, "1"); app.agregar_al_carrito_ventas()
+    n = len(avisos); app.procesar_boleta("FIADO")
+    assert avisos[n:] and len(app.carrito_ventas) == 1 and app.db.obtener_producto("UREA")["stock"] == 8
+    app.db.agregar_contacto("cliente", "JUAN", "", ""); app.actualizar_combos_personas(); app.combo_cliente_venta.set("JUAN")
+    app.procesar_boleta("FIADO"); app.update()
+    assert app.db.obtener_producto("UREA")["stock"] == 7 and len(app.db.obtener_deudas_pendientes()) == 1
+
+def t_cobrar_deuda_ui():
+    app.cargar_fiados(); app.update()
+    app.tree_fiados.selection_set(app.tree_fiados.get_children()[0])
+    app.combo_encargada.set("Administradora")
+    app.cobrar_deuda(); app.update()
+    assert app.db.obtener_deudas_pendientes() == []
+    cobro = app.db.cursor.execute("SELECT encargada, cantidad, ref_id FROM transacciones WHERE tipo='COBRO_DEUDA'").fetchone()
+    assert cobro[0] == "Administradora" and cobro[1] == 0 and cobro[2] is not None, cobro
+
+def t_compra_ui():
+    app.db.agregar_contacto("proveedor", "AGROSUR", "", ""); app.actualizar_combos_personas()
+    simpledialog.askfloat = lambda *a, **k: 110.0
+    app.vaciar_carrito("compras")
+    app.producto_sel["compras"] = app.db.obtener_producto("UREA")
+    app.ent_cantidad_compras.delete(0, tk.END); app.ent_cantidad_compras.insert(0, "10"); app.agregar_al_carrito_compras()
+    app.procesar_boleta_compra(); app.update()
+    p = app.db.obtener_producto("UREA")
+    assert app.carrito_compras == [] and p["stock"] == 17 and p["precio_compra"] == 110.0, p
+
+def t_borrar_operacion_ui():
+    app.generar_reporte_mensual(); app.update()
+    def fila_tipo(tipo):
+        for iid in app.tree_mensual.get_children():
+            if app.tree_mensual.item(iid)["values"][2] == tipo: return iid
+        raise AssertionError(f"sin fila {tipo}")
+    # borrar el FIADO ya pagado se bloquea con aviso
+    app.tree_mensual.selection_set(fila_tipo("FIADO")); n = len(avisos); app.borrar_operacion(); app.update()
+    assert avisos[n:] and "pagados" in avisos[-1][1] and app.db.cursor.execute("SELECT count(*) FROM transacciones WHERE tipo='FIADO'").fetchone()[0] == 1
+    # borrar el COBRO reabre el fiado
+    app.tree_mensual.selection_set(fila_tipo("COBRO_DEUDA")); app.borrar_operacion(); app.update()
+    assert len(app.db.obtener_deudas_pendientes()) == 1
+    # y ahora el FIADO sí se borra devolviendo stock
+    app.tree_mensual.selection_set(fila_tipo("FIADO")); app.borrar_operacion(); app.update()
+    assert app.db.obtener_deudas_pendientes() == [] and app.db.obtener_producto("UREA")["stock"] == 18
+
 print(f"== {mod_name} ==")
 for nombre, fn in [
     ("doble agregado del mismo producto", t_doble_agregado),
@@ -133,6 +182,10 @@ for nombre, fn in [
     ("parse_cantidad 1/0 -> ValueError", t_parse_div_cero),
     ("compras: doble agregado", t_compras_doble),
     ("producto borrado avisa en vez de fallar", t_producto_borrado),
+    ("finalizar venta y fiado (atómico, cliente obligatorio)", t_finalizar_venta_y_fiado),
+    ("cobrar deuda desde la UI con encargada actual", t_cobrar_deuda_ui),
+    ("ingreso de mercadería actualiza stock y costo", t_compra_ui),
+    ("eliminar operaciones: bloqueo de fiado pagado y reapertura", t_borrar_operacion_ui),
 ]:
     caso(nombre, fn)
 app.destroy()

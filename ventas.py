@@ -7,6 +7,9 @@ import datetime
 import pandas as pd
 import shutil
 import os
+import logging
+from logging.handlers import RotatingFileHandler
+from contextlib import contextmanager
 import calendar
 import matplotlib
 matplotlib.use('TkAgg')
@@ -17,178 +20,254 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 ctk.set_appearance_mode("Light")
 ctk.set_default_color_theme("blue")
 
+# --- 0. LOGGING ---
+log = logging.getLogger("agro")
+
+def configurar_logging(ruta_db):
+    """Escribe app.log junto a la BD (1 MB x 3 archivos). Idempotente."""
+    if any(getattr(h, "_agro", False) for h in log.handlers):
+        return
+    carpeta = os.path.dirname(os.path.abspath(ruta_db)) if ruta_db != ":memory:" else os.getcwd()
+    handler = RotatingFileHandler(os.path.join(carpeta, "app.log"), maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    handler._agro = True
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+
+
 # --- 1. BASE DE DATOS ---
 class BaseDatos:
+    # Códigos que devuelve eliminar_transaccion_y_reversar_stock
+    OK, NO_EXISTE, FIADO_PAGADO, ERROR = "OK", "NO_EXISTE", "FIADO_PAGADO", "ERROR"
+
     def __init__(self, db_name="negocio_final_stock.db"):
         self.db_name = db_name
-        self.conn = sqlite3.connect(db_name)
+        configurar_logging(db_name)
+        # isolation_level=None: autocommit por sentencia; las operaciones de varias
+        # sentencias se agrupan explícitamente con `with self.transaccion():`.
+        self.conn = sqlite3.connect(db_name, isolation_level=None)
         self.cursor = self.conn.cursor()
+        self._nivel_transaccion = 0
+        self.cursor.execute("PRAGMA foreign_keys=ON")
+        if db_name != ":memory:":
+            self.cursor.execute("PRAGMA journal_mode=WAL")
         self.crear_tablas()
         self.migrar_tablas()
+        log.info("BD abierta: %s", db_name)
 
+    @contextmanager
+    def transaccion(self):
+        """Agrupa varias sentencias: se guardan todas o ninguna. Admite anidamiento
+        (el bloque interno se une al externo)."""
+        if self._nivel_transaccion == 0:
+            self.cursor.execute("BEGIN")
+        self._nivel_transaccion += 1
+        try:
+            yield
+        except BaseException:
+            self._nivel_transaccion -= 1
+            if self._nivel_transaccion == 0 and self.conn.in_transaction:
+                self.conn.rollback()
+            raise
+        else:
+            self._nivel_transaccion -= 1
+            if self._nivel_transaccion == 0:
+                self.conn.commit()
+
+    def cerrar(self):
+        try:
+            self.conn.close()
+        except sqlite3.Error as e:
+            log.warning("Error al cerrar la BD: %s", e)
+
+    def respaldar_a(self, ruta_destino):
+        """Copia consistente de la BD (segura con WAL) usando la API de respaldo de SQLite."""
+        destino = sqlite3.connect(ruta_destino)
+        try:
+            self.conn.backup(destino)
+        finally:
+            destino.close()
+        log.info("Respaldo creado en %s", ruta_destino)
+
+    # --- Esquema ---
     def crear_tablas(self):
         # Se usa REAL en stock y cantidad para soportar dosis (1/2, 0.5, etc.)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS productos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT UNIQUE,
-                precio REAL,
-                precio_compra REAL DEFAULT 0.0,
-                stock REAL
-            )
-        """)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS transacciones (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fecha TEXT,
-                hora TEXT,
-                tipo TEXT,
-                producto TEXT,
-                cantidad REAL,
-                total_dinero REAL,
-                encargada TEXT,
-                stock_resultante REAL,
-                cliente TEXT,
-                proveedor TEXT,
-                estado TEXT
-            )
-        """)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS encargadas (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT UNIQUE
-            )
-        """)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS clientes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT UNIQUE,
-                documento TEXT,
-                telefono TEXT
-            )
-        """)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS proveedores (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT UNIQUE,
-                contacto TEXT,
-                telefono TEXT
-            )
-        """)
-        self.conn.commit()
-        
-        # Inserciones por defecto
-        self.cursor.execute("SELECT count(*) FROM encargadas")
-        if self.cursor.fetchone()[0] == 0:
-            self.cursor.execute("INSERT INTO encargadas (nombre) VALUES ('Administradora')")
-            
-        self.cursor.execute("SELECT count(*) FROM clientes")
-        if self.cursor.fetchone()[0] == 0:
-            self.cursor.execute("INSERT INTO clientes (nombre, documento, telefono) VALUES ('PÚBLICO GENERAL', '-', '-')")
-            
-        self.conn.commit()
+        with self.transaccion():
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS productos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT UNIQUE,
+                    precio REAL,
+                    precio_compra REAL DEFAULT 0.0,
+                    stock REAL
+                )
+            """)
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS transacciones (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fecha TEXT,
+                    hora TEXT,
+                    tipo TEXT,
+                    producto TEXT,
+                    cantidad REAL,
+                    total_dinero REAL,
+                    encargada TEXT,
+                    stock_resultante REAL,
+                    cliente TEXT,
+                    proveedor TEXT,
+                    estado TEXT,
+                    ref_id INTEGER
+                )
+            """)
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS encargadas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT UNIQUE
+                )
+            """)
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS clientes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT UNIQUE,
+                    documento TEXT,
+                    telefono TEXT
+                )
+            """)
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS proveedores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT UNIQUE,
+                    contacto TEXT,
+                    telefono TEXT
+                )
+            """)
+            # Inserciones por defecto
+            if self.cursor.execute("SELECT count(*) FROM encargadas").fetchone()[0] == 0:
+                self.cursor.execute("INSERT INTO encargadas (nombre) VALUES ('Administradora')")
+            if self.cursor.execute("SELECT count(*) FROM clientes").fetchone()[0] == 0:
+                self.cursor.execute("INSERT INTO clientes (nombre, documento, telefono) VALUES ('PÚBLICO GENERAL', '-', '-')")
+
+    def columnas_de(self, tabla):
+        return {row[1] for row in self.cursor.execute(f"PRAGMA table_info({tabla})")}
 
     def migrar_tablas(self):
+        """Añade columnas que falten en BDs creadas por versiones anteriores."""
         columnas = [
             ("transacciones", "cliente", "TEXT"),
             ("transacciones", "estado", "TEXT"),
             ("transacciones", "proveedor", "TEXT"),
-            ("productos", "precio_compra", "REAL DEFAULT 0.0")
+            ("transacciones", "ref_id", "INTEGER"),
+            ("productos", "precio_compra", "REAL DEFAULT 0.0"),
         ]
-        for tabla, col, tipo in columnas:
-            try:
-                self.cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
-            except: pass
-        self.conn.commit()
+        with self.transaccion():
+            for tabla, col, tipo in columnas:
+                if col not in self.columnas_de(tabla):
+                    self.cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
+                    log.info("Migración: columna %s.%s añadida", tabla, col)
 
     # --- Funciones de Productos ---
     def agregar_producto(self, nombre, precio, precio_compra, stock):
         try:
             self.cursor.execute("INSERT INTO productos (nombre, precio, precio_compra, stock) VALUES (?, ?, ?, ?)", (nombre, precio, precio_compra, stock))
-            self.conn.commit()
             return True
         except sqlite3.IntegrityError:
             return False
 
     def modificar_producto(self, nombre_actual, nuevo_nombre, nuevo_precio, nuevo_precio_compra, nuevo_stock=None):
+        """Renombra/actualiza el producto y su historial en una sola transacción.
+        Si el nuevo nombre ya existe no queda ningún cambio parcial."""
         try:
-            if nombre_actual != nuevo_nombre:
-                self.cursor.execute("UPDATE transacciones SET producto=? WHERE producto=?", (nuevo_nombre, nombre_actual))
-            
-            if nuevo_stock is not None:
-                self.cursor.execute("UPDATE productos SET nombre=?, precio=?, precio_compra=?, stock=? WHERE nombre=?", (nuevo_nombre, nuevo_precio, nuevo_precio_compra, nuevo_stock, nombre_actual))
-            else:
-                self.cursor.execute("UPDATE productos SET nombre=?, precio=?, precio_compra=? WHERE nombre=?", (nuevo_nombre, nuevo_precio, nuevo_precio_compra, nombre_actual))
-            self.conn.commit()
+            with self.transaccion():
+                if nombre_actual != nuevo_nombre:
+                    self.cursor.execute("UPDATE transacciones SET producto=? WHERE producto=?", (nuevo_nombre, nombre_actual))
+                if nuevo_stock is not None:
+                    self.cursor.execute("UPDATE productos SET nombre=?, precio=?, precio_compra=?, stock=? WHERE nombre=?", (nuevo_nombre, nuevo_precio, nuevo_precio_compra, nuevo_stock, nombre_actual))
+                else:
+                    self.cursor.execute("UPDATE productos SET nombre=?, precio=?, precio_compra=? WHERE nombre=?", (nuevo_nombre, nuevo_precio, nuevo_precio_compra, nombre_actual))
             return True
         except sqlite3.IntegrityError:
+            log.warning("No se pudo renombrar '%s' a '%s': el nombre ya existe", nombre_actual, nuevo_nombre)
             return False
-        except Exception as e:
+        except sqlite3.Error as e:
+            log.error("Error al modificar producto '%s': %s", nombre_actual, e)
             return False
 
     def eliminar_producto(self, nombre_producto):
         try:
             self.cursor.execute("DELETE FROM productos WHERE nombre=?", (nombre_producto,))
-            self.conn.commit()
             return True
-        except: return False
+        except sqlite3.Error as e:
+            log.error("Error al eliminar producto '%s': %s", nombre_producto, e)
+            return False
+
+    def actualizar_precio_compra(self, nombre, precio_compra):
+        self.cursor.execute("UPDATE productos SET precio_compra=? WHERE nombre=?", (precio_compra, nombre))
 
     def actualizar_stock_y_obtener_saldo(self, nombre, cantidad, operacion):
+        res = self.cursor.execute("SELECT stock FROM productos WHERE nombre=?", (nombre,)).fetchone()
+        if not res:
+            return 0 if operacion == "neutro" else None
+        stock_actual = float(res[0])
         if operacion == "neutro":
-            curr = self.cursor.execute("SELECT stock FROM productos WHERE nombre=?", (nombre,))
-            res = curr.fetchone()
-            return res[0] if res else 0
-
-        curr = self.cursor.execute("SELECT stock FROM productos WHERE nombre=?", (nombre,))
-        res = curr.fetchone()
-        if res:
-            stock_actual = float(res[0])
-            if operacion == "sumar": nuevo_stock = stock_actual + cantidad
-            else: nuevo_stock = stock_actual - cantidad
-
-            self.cursor.execute("UPDATE productos SET stock=? WHERE nombre=?", (nuevo_stock, nombre))
-            self.conn.commit()
-            return nuevo_stock
-        return None
+            return stock_actual
+        nuevo_stock = stock_actual + cantidad if operacion == "sumar" else stock_actual - cantidad
+        self.cursor.execute("UPDATE productos SET stock=? WHERE nombre=?", (nuevo_stock, nombre))
+        return nuevo_stock
 
     # --- Funciones de Transacciones ---
-    def registrar_transaccion(self, fecha_manual, tipo, producto, cantidad, total, encargada, stock_final, cliente="", proveedor="", estado="", hora_manual=None):
+    def registrar_transaccion(self, fecha_manual, tipo, producto, cantidad, total, encargada, stock_final, cliente="", proveedor="", estado="", hora_manual=None, ref_id=None):
         hora = hora_manual if hora_manual else datetime.datetime.now().strftime("%H:%M:%S")
         self.cursor.execute("""
-            INSERT INTO transacciones (fecha, hora, tipo, producto, cantidad, total_dinero, encargada, stock_resultante, cliente, proveedor, estado)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (str(fecha_manual), hora, tipo, producto, cantidad, total, encargada, stock_final, cliente, proveedor, estado))
-        self.conn.commit()
+            INSERT INTO transacciones (fecha, hora, tipo, producto, cantidad, total_dinero, encargada, stock_resultante, cliente, proveedor, estado, ref_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (str(fecha_manual), hora, tipo, producto, cantidad, total, encargada, stock_final, cliente, proveedor, estado, ref_id))
+        return self.cursor.lastrowid
 
-    def pagar_fiado(self, id_transaccion_original):
-        cur = self.cursor.execute("SELECT producto, total_dinero, cliente FROM transacciones WHERE id=?", (id_transaccion_original,))
-        row = cur.fetchone()
-        if not row: return False
-        prod, monto, cliente = row
-        
-        self.cursor.execute("UPDATE transacciones SET estado='PAGADO' WHERE id=?", (id_transaccion_original,))
-        fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
-        stock_actual = self.actualizar_stock_y_obtener_saldo(prod, 0, "neutro")
-        
-        self.registrar_transaccion(fecha_hoy, "COBRO_DEUDA", prod, 1, monto, "Admin", stock_actual, cliente=cliente, estado="COMPLETADO")
-        return True
+    def pagar_fiado(self, id_fiado, encargada, fecha=None):
+        """Marca el FIADO como PAGADO y registra el COBRO_DEUDA enlazado por ref_id."""
+        row = self.cursor.execute("SELECT producto, total_dinero, cliente, estado FROM transacciones WHERE id=? AND tipo='FIADO'", (id_fiado,)).fetchone()
+        if not row:
+            return False
+        prod, monto, cliente, estado = row
+        if estado == "PAGADO":
+            return False
+        fecha = fecha or datetime.date.today().strftime("%Y-%m-%d")
+        try:
+            with self.transaccion():
+                self.cursor.execute("UPDATE transacciones SET estado='PAGADO' WHERE id=?", (id_fiado,))
+                stock_actual = self.actualizar_stock_y_obtener_saldo(prod, 0, "neutro")
+                self.registrar_transaccion(fecha, "COBRO_DEUDA", prod, 0, monto, encargada, stock_actual, cliente=cliente, estado="COMPLETADO", ref_id=id_fiado)
+            log.info("Fiado %s de %s cobrado (S/. %.2f) por %s", id_fiado, cliente, monto, encargada)
+            return True
+        except sqlite3.Error as e:
+            log.error("Error al cobrar fiado %s: %s", id_fiado, e)
+            return False
 
     def eliminar_transaccion_y_reversar_stock(self, id_transaccion):
-        cur = self.cursor.execute("SELECT tipo, producto, cantidad FROM transacciones WHERE id=?", (id_transaccion,))
-        row = cur.fetchone()
-        if not row: return False 
-        
-        tipo_orig, prod, cant = row
+        """Borra una transacción deshaciendo su efecto. Devuelve OK, NO_EXISTE, FIADO_PAGADO o ERROR."""
+        row = self.cursor.execute("SELECT tipo, producto, cantidad, estado, ref_id FROM transacciones WHERE id=?", (id_transaccion,)).fetchone()
+        if not row:
+            return self.NO_EXISTE
+        tipo_orig, prod, cant, estado, ref_id = row
+        if tipo_orig == "FIADO" and estado == "PAGADO":
+            return self.FIADO_PAGADO  # primero hay que eliminar el cobro asociado
         try:
-            if tipo_orig in ["VENTA", "FIADO"]:
-                self.cursor.execute("UPDATE productos SET stock = stock + ? WHERE nombre = ?", (cant, prod))
-            elif tipo_orig == "ENTRADA":
-                self.cursor.execute("UPDATE productos SET stock = stock - ? WHERE nombre = ?", (cant, prod))
-            
-            self.cursor.execute("DELETE FROM transacciones WHERE id=?", (id_transaccion,))
-            self.conn.commit()
-            return "OK"
-        except Exception: return "ERROR"
+            with self.transaccion():
+                if tipo_orig in ("VENTA", "FIADO"):
+                    self.cursor.execute("UPDATE productos SET stock = stock + ? WHERE nombre = ?", (cant, prod))
+                elif tipo_orig == "ENTRADA":
+                    self.cursor.execute("UPDATE productos SET stock = stock - ? WHERE nombre = ?", (cant, prod))
+                elif tipo_orig == "COBRO_DEUDA":
+                    if ref_id is not None:
+                        self.cursor.execute("UPDATE transacciones SET estado='PENDIENTE' WHERE id=? AND tipo='FIADO'", (ref_id,))
+                    else:
+                        log.warning("Cobro %s sin ref_id (registro antiguo): el fiado original no se reabre", id_transaccion)
+                self.cursor.execute("DELETE FROM transacciones WHERE id=?", (id_transaccion,))
+            log.info("Transacción %s (%s %s) eliminada", id_transaccion, tipo_orig, prod)
+            return self.OK
+        except sqlite3.Error as e:
+            log.error("Error al eliminar transacción %s: %s", id_transaccion, e)
+            return self.ERROR
 
     # --- Contactos e Info ---
     def agregar_contacto(self, tipo, nombre, doc_cont, tel):
@@ -196,18 +275,19 @@ class BaseDatos:
         col2 = "documento" if tipo == "cliente" else "contacto"
         try:
             self.cursor.execute(f"INSERT INTO {tabla} (nombre, {col2}, telefono) VALUES (?, ?, ?)", (nombre, doc_cont, tel))
-            self.conn.commit()
             return True
-        except sqlite3.IntegrityError: return False
+        except sqlite3.IntegrityError:
+            return False
 
     def eliminar_contacto(self, tipo, nombre):
         if nombre == "PÚBLICO GENERAL": return False
         tabla = "clientes" if tipo == "cliente" else "proveedores"
         try:
             self.cursor.execute(f"DELETE FROM {tabla} WHERE nombre=?", (nombre,))
-            self.conn.commit()
             return True
-        except: return False
+        except sqlite3.Error as e:
+            log.error("Error al eliminar %s '%s': %s", tipo, nombre, e)
+            return False
 
     def obtener_contactos(self, tipo):
         tabla = "clientes" if tipo == "cliente" else "proveedores"
@@ -225,14 +305,14 @@ class BaseDatos:
         row = self.cursor.execute("SELECT nombre, precio, precio_compra, stock FROM productos WHERE nombre=?", (nombre,)).fetchone()
         if not row: return None
         return {"nombre": row[0], "precio": float(row[1] or 0.0), "precio_compra": float(row[2] or 0.0), "stock": float(row[3] or 0.0)}
-    
+
     def obtener_lista_nombres_productos(self):
         return [row[0] for row in self.cursor.execute("SELECT nombre FROM productos ORDER BY nombre")]
 
     def obtener_total_stock_actual(self):
         res = self.cursor.execute("SELECT SUM(stock) FROM productos").fetchone()
         return f"{res[0]:g}" if res[0] else 0
-    
+
     def obtener_deudas_pendientes(self):
         return self.cursor.execute("SELECT id, fecha, cliente, producto, cantidad, total_dinero FROM transacciones WHERE tipo='FIADO' AND estado='PENDIENTE'").fetchall()
 
@@ -242,17 +322,18 @@ class BaseDatos:
     def agregar_encargada(self, nombre):
         try:
             self.cursor.execute("INSERT INTO encargadas (nombre) VALUES (?)", (nombre,))
-            self.conn.commit()
             return True
-        except: return False
+        except sqlite3.IntegrityError:
+            return False
 
     def eliminar_encargada(self, nombre_encargada):
-        if nombre_encargada == "Administradora": return False 
+        if nombre_encargada == "Administradora": return False
         try:
             self.cursor.execute("DELETE FROM encargadas WHERE nombre=?", (nombre_encargada,))
-            self.conn.commit()
             return True
-        except: return False
+        except sqlite3.Error as e:
+            log.error("Error al eliminar encargada '%s': %s", nombre_encargada, e)
+            return False
 
     def obtener_encargadas(self):
         return [row[0] for row in self.cursor.execute("SELECT nombre FROM encargadas")]
@@ -265,7 +346,9 @@ class Aplicacion(ctk.CTk):
         self.title("Sistema Agro-Negocio Familiar v4.0 Pro")
         self.geometry("1200x800")
         self.db = BaseDatos()
-        
+        # Los errores dentro de callbacks de Tk no llegan a la consola en el .exe: van al log y a un aviso.
+        self.report_callback_exception = self._error_no_controlado
+
         self.carrito_ventas = []
         self.carrito_compras = []
         # Producto seleccionado en cada pantalla (dict de BaseDatos.obtener_producto o None).
@@ -286,6 +369,10 @@ class Aplicacion(ctk.CTk):
         self.actualizar_combos_personas()
         
         self.seleccionar_frame("ventas")
+
+    def _error_no_controlado(self, exc_type, exc_value, exc_tb):
+        log.exception("Error no controlado en la interfaz", exc_info=(exc_type, exc_value, exc_tb))
+        messagebox.showerror("Error inesperado", f"{exc_type.__name__}: {exc_value}\n\nEl detalle quedó en app.log.")
 
     def parse_cantidad(self, valor_str):
         """Convierte '1.5', '0,5' o '1/2' en float. Lanza ValueError si no es válido."""
@@ -364,23 +451,35 @@ class Aplicacion(ctk.CTk):
         fp = filedialog.asksaveasfilename(defaultextension=".db", filetypes=[("SQLite DB", "*.db")], initialfile="Copia_AgroNegocio.db")
         if fp:
             try:
-                shutil.copy("negocio_final_stock.db", fp)
+                self.db.respaldar_a(fp)
                 messagebox.showinfo("Éxito", "Copia guardada en:\n" + fp)
-            except Exception as e: messagebox.showerror("Error", f"Fallo al respaldar: {e}")
+            except (sqlite3.Error, OSError) as e:
+                log.error("Fallo al respaldar en %s: %s", fp, e)
+                messagebox.showerror("Error", f"Fallo al respaldar: {e}")
 
     def restaurar_bd(self):
         fp = filedialog.askopenfilename(filetypes=[("SQLite DB", "*.db")], title="Selecciona el archivo")
-        if fp:
-            if messagebox.askyesno("⚠️ Advertencia", "Esto reemplazará TODOS los datos actuales.\n¿Continuar?"):
-                try:
-                    self.db.conn.close()
-                    shutil.copy(fp, "negocio_final_stock.db")
-                    self.db = BaseDatos()
-                    self.actualizar_combos_personas()
-                    self.cargar_tabla_productos()
-                    self.cargar_fiados()
-                    messagebox.showinfo("Éxito", "Base de datos restaurada.")
-                except Exception as e: messagebox.showerror("Error", f"Fallo al restaurar: {e}")
+        if not fp: return
+        if not messagebox.askyesno("⚠️ Advertencia", "Esto reemplazará TODOS los datos actuales.\n¿Continuar?"): return
+        ruta_db = self.db.db_name
+        try:
+            self.db.cerrar()
+            # Si quedaran archivos WAL de la BD anterior, corromperían la restaurada.
+            for sufijo in ("-wal", "-shm"):
+                if os.path.exists(ruta_db + sufijo): os.remove(ruta_db + sufijo)
+            shutil.copy(fp, ruta_db)
+            log.info("BD restaurada desde %s", fp)
+            messagebox.showinfo("Éxito", "Base de datos restaurada.")
+        except (sqlite3.Error, OSError) as e:
+            log.error("Fallo al restaurar desde %s: %s", fp, e)
+            messagebox.showerror("Error", f"Fallo al restaurar: {e}")
+        finally:
+            self.db = BaseDatos(ruta_db)
+            self.actualizar_lista_encargadas()
+            self.actualizar_combos_personas()
+            self.actualizar_combo_productos()
+            self.cargar_tabla_productos()
+            self.cargar_fiados()
 
     # Utilidad Fecha Reutilizable
     def abrir_calendario_popup(self, entry_widget):
@@ -925,7 +1024,8 @@ class Aplicacion(ctk.CTk):
             sel_actual = self.combo_dia.get()
             self.combo_dia.configure(values=opciones)
             self.combo_dia.set(sel_actual if sel_actual in opciones else "Todos")
-        except: pass
+        except (KeyError, ValueError) as e:
+            log.warning("No se pudo actualizar la lista de días: %s", e)
 
     # Lógica Contactos
     def guardar_contacto(self, tipo):
@@ -1092,11 +1192,18 @@ class Aplicacion(ctk.CTk):
 
         estado = "PAGADO" if tipo == "VENTA" else "PENDIENTE"
 
-        for item in self.carrito_ventas:
-            prod, cant, dinero = item['producto'], item['cantidad'], item['subtotal']
-            nuevo_stk = self.db.actualizar_stock_y_obtener_saldo(prod, cant, "restar")
-            if nuevo_stk is not None:
-                self.db.registrar_transaccion(fecha_txt, tipo, prod, cant, dinero, encargada, nuevo_stk, cliente=cliente, estado=estado, hora_manual=hora_boleta)
+        try:
+            # Toda la boleta se guarda o no se guarda nada.
+            with self.db.transaccion():
+                for item in self.carrito_ventas:
+                    prod, cant, dinero = item['producto'], item['cantidad'], item['subtotal']
+                    nuevo_stk = self.db.actualizar_stock_y_obtener_saldo(prod, cant, "restar")
+                    if nuevo_stk is not None:
+                        self.db.registrar_transaccion(fecha_txt, tipo, prod, cant, dinero, encargada, nuevo_stk, cliente=cliente, estado=estado, hora_manual=hora_boleta)
+        except sqlite3.Error as e:
+            log.error("Fallo al registrar %s: %s", tipo, e)
+            return messagebox.showerror("Error", f"No se guardó la operación (ningún producto fue descontado):\n{e}")
+        log.info("%s registrada: %d líneas, cliente %s, encargada %s", tipo, len(self.carrito_ventas), cliente, encargada)
 
         self.vaciar_carrito("ventas"); self.ent_buscar_ventas.delete(0, tk.END)
         self.cargar_tabla_productos()
@@ -1112,13 +1219,18 @@ class Aplicacion(ctk.CTk):
 
         if not proveedor: return messagebox.showwarning("Atención", "Seleccione un proveedor.")
 
-        for item in self.carrito_compras:
-            prod, cant, dinero = item['producto'], item['cantidad'], item['subtotal']
-            nuevo_stk = self.db.actualizar_stock_y_obtener_saldo(prod, cant, "sumar")
-            if nuevo_stk is not None:
-                self.db.registrar_transaccion(fecha_txt, "ENTRADA", prod, cant, dinero, encargada, nuevo_stk, proveedor=proveedor, estado="PAGADO", hora_manual=hora_boleta)
-                self.db.cursor.execute("UPDATE productos SET precio_compra=? WHERE nombre=?", (item['precio_unit'], prod))
-        self.db.conn.commit()
+        try:
+            with self.db.transaccion():
+                for item in self.carrito_compras:
+                    prod, cant, dinero = item['producto'], item['cantidad'], item['subtotal']
+                    nuevo_stk = self.db.actualizar_stock_y_obtener_saldo(prod, cant, "sumar")
+                    if nuevo_stk is not None:
+                        self.db.registrar_transaccion(fecha_txt, "ENTRADA", prod, cant, dinero, encargada, nuevo_stk, proveedor=proveedor, estado="PAGADO", hora_manual=hora_boleta)
+                        self.db.actualizar_precio_compra(prod, item['precio_unit'])
+        except sqlite3.Error as e:
+            log.error("Fallo al registrar ENTRADA: %s", e)
+            return messagebox.showerror("Error", f"No se guardó el ingreso (ningún stock fue modificado):\n{e}")
+        log.info("ENTRADA registrada: %d líneas, proveedor %s, encargada %s", len(self.carrito_compras), proveedor, encargada)
 
         self.vaciar_carrito("compras"); self.ent_buscar_compras.delete(0, tk.END)
         self.cargar_tabla_productos()
@@ -1237,12 +1349,22 @@ class Aplicacion(ctk.CTk):
                         ids_a_eliminar.add(values[0])
 
             if ids_a_eliminar:
+                bloqueados, errores = [], []
                 for db_id in ids_a_eliminar:
-                    self.db.eliminar_transaccion_y_reversar_stock(db_id)
-                
+                    res = self.db.eliminar_transaccion_y_reversar_stock(db_id)
+                    if res == BaseDatos.FIADO_PAGADO: bloqueados.append(str(db_id))
+                    elif res == BaseDatos.ERROR: errores.append(str(db_id))
+
                 self.generar_reporte_mensual()
                 self.cargar_tabla_productos()
                 self.cargar_fiados()
+
+                if bloqueados:
+                    messagebox.showwarning("Fiados ya cobrados",
+                        f"No se eliminaron {len(bloqueados)} fiado(s) porque ya fueron pagados.\n"
+                        "Primero elimina el cobro asociado (fila COBRO_DEUDA) y vuelve a intentarlo.")
+                if errores:
+                    messagebox.showerror("Error", f"No se pudieron eliminar {len(errores)} fila(s). Revisa app.log.")
 
     def nueva_encargada(self):
         nom = simpledialog.askstring("Nuevo", "Nombre:")
@@ -1302,7 +1424,10 @@ class Aplicacion(ctk.CTk):
         if not sel: return
         val = self.tree_fiados.item(sel[0])['values']
         if messagebox.askyesno("Cobro", f"¿{val[2]} paga {val[5]}?"):
-            if self.db.pagar_fiado(val[0]): self.cargar_fiados(); self.generar_reporte_mensual()
+            if self.db.pagar_fiado(val[0], encargada=self.combo_encargada.get()):
+                self.cargar_fiados(); self.generar_reporte_mensual()
+            else:
+                messagebox.showerror("Error", "No se pudo registrar el cobro. Revisa app.log.")
 
     def al_seleccionar_producto(self, tipo):
         """Guarda como estado el producto elegido en la tabla de Ventas o Compras."""
@@ -1334,13 +1459,12 @@ class Aplicacion(ctk.CTk):
 
     def al_seleccionar_producto_editar(self, nombre):
         if not nombre: return
-        cur = self.db.cursor.execute("SELECT precio, precio_compra, stock FROM productos WHERE nombre=?", (nombre,))
-        row = cur.fetchone()
-        if row:
+        prod = self.db.obtener_producto(nombre)
+        if prod:
             self.e_edit_nom.delete(0, tk.END); self.e_edit_nom.insert(0, nombre)
-            self.e_edit_prec.delete(0, tk.END); self.e_edit_prec.insert(0, row[0])
-            self.e_edit_prec_comp.delete(0, tk.END); self.e_edit_prec_comp.insert(0, row[1] if row[1] else 0.0)
-            self.e_edit_stk.delete(0, tk.END); self.e_edit_stk.insert(0, f"{row[2]:g}")
+            self.e_edit_prec.delete(0, tk.END); self.e_edit_prec.insert(0, prod['precio'])
+            self.e_edit_prec_comp.delete(0, tk.END); self.e_edit_prec_comp.insert(0, prod['precio_compra'])
+            self.e_edit_stk.delete(0, tk.END); self.e_edit_stk.insert(0, f"{prod['stock']:g}")
     
     def actualizar_combo_productos(self, event=None):
         l = self.db.obtener_lista_nombres_productos()
