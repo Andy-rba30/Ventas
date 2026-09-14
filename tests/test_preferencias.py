@@ -52,3 +52,20 @@ def test_memoria_no_escribe_archivo(tmp_path, monkeypatch):
     p = Preferencias(":memory:")
     p.set("apariencia", "Dark")
     assert p.ruta is None and p.get("apariencia") == "Dark" and list(tmp_path.iterdir()) == []
+
+
+def test_negocio_por_defecto_y_fusion_de_subclaves(tmp_path):
+    ruta_db = str(tmp_path / "negocio.db")
+    p = Preferencias(ruta_db)
+    assert p.get("negocio") == {"nombre": "", "ruc": "", "direccion": ""}
+    # lo que devuelve get es una copia: mutarla no altera las preferencias ni los valores por defecto
+    p.get("negocio")["nombre"] = "X"
+    assert p.get("negocio")["nombre"] == "" and VALORES_DEFECTO["negocio"]["nombre"] == ""
+    p.set("negocio", {"nombre": "AGRO SAN JOSE", "ruc": "201", "direccion": "Av. 1"})
+    assert Preferencias(ruta_db).get("negocio")["ruc"] == "201"
+    # un config.json antiguo con la subclave incompleta se completa con los valores por defecto
+    (tmp_path / "config.json").write_text(json.dumps({"negocio": {"nombre": "VIEJO"}}), encoding="utf-8")
+    q = Preferencias(ruta_db)
+    assert q.get("negocio") == {"nombre": "VIEJO", "ruc": "", "direccion": ""}
+    (tmp_path / "config.json").write_text(json.dumps({"negocio": "texto suelto"}), encoding="utf-8")
+    assert Preferencias(ruta_db).get("negocio") == VALORES_DEFECTO["negocio"]

@@ -1,5 +1,6 @@
 """Preferencias de la usuaria en config.json, junto a la BD: apariencia, tamaño de
-ventana y último respaldo. Nunca contienen datos del negocio."""
+ventana, último respaldo y datos del negocio para la boleta. Nunca contienen datos de ventas."""
+import copy
 import json
 import os
 
@@ -9,6 +10,7 @@ VALORES_DEFECTO = {
     "apariencia": "Light",      # Light | Dark | System
     "geometria": None,          # "1200x800+100+50" tal como lo devuelve Tk
     "ultimo_respaldo": None,    # {"fecha": "2026-09-14 10:30", "ruta": "..."}
+    "negocio": {"nombre": "", "ruc": "", "direccion": ""},   # cabecera de la boleta imprimible
 }
 
 
@@ -18,7 +20,7 @@ class Preferencias:
             self.ruta = None
         else:
             self.ruta = os.path.join(os.path.dirname(os.path.abspath(ruta_db)), "config.json")
-        self.datos = dict(VALORES_DEFECTO)
+        self.datos = copy.deepcopy(VALORES_DEFECTO)
         self.cargar()
 
     def cargar(self):
@@ -29,8 +31,13 @@ class Preferencias:
                 leidos = json.load(f)
             if not isinstance(leidos, dict):
                 raise ValueError("config.json no contiene un objeto")
-            for clave in VALORES_DEFECTO:
-                if clave in leidos:
+            for clave, defecto in VALORES_DEFECTO.items():
+                if clave not in leidos:
+                    continue
+                if isinstance(defecto, dict):  # se completan las subclaves que falten
+                    if isinstance(leidos[clave], dict):
+                        self.datos[clave] = {**defecto, **leidos[clave]}
+                else:
                     self.datos[clave] = leidos[clave]
         except (OSError, ValueError) as e:
             log.warning("config.json ilegible, se usan valores por defecto: %s", e)
@@ -47,7 +54,7 @@ class Preferencias:
             log.error("No se pudo guardar config.json: %s", e)
 
     def get(self, clave):
-        return self.datos.get(clave, VALORES_DEFECTO.get(clave))
+        return copy.deepcopy(self.datos.get(clave, VALORES_DEFECTO.get(clave)))
 
     def set(self, clave, valor):
         if clave not in VALORES_DEFECTO:

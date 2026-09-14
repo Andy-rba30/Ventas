@@ -26,6 +26,7 @@ def test_capa_de_datos_y_servicios_sin_pandas_ni_matplotlib():
 def test_interfaz_sin_pandas_ni_matplotlib():
     cargados = _modulos_cargados_al_importar("agro.ui.app")
     assert "pandas" not in cargados and "matplotlib" not in cargados
+    assert "reportlab" not in cargados and "openpyxl" not in cargados  # solo al imprimir o exportar
 
 
 def test_requirements_sin_pandas_ni_matplotlib():

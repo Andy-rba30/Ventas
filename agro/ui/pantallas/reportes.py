@@ -101,6 +101,7 @@ class PantallaReportes(ctk.CTkFrame):
         self.lbl_movimientos.pack(side="left")
         boton_peligro(toolbar, "Eliminar seleccionado", self.borrar_operacion, width=170, height=30).pack(side="right")
         boton_exito(toolbar, "Exportar Excel", self.exportar_excel, width=140, height=30).pack(side="right", padx=(0, s))
+        boton_secundario(toolbar, "🖨 Imprimir boleta", self.imprimir_boleta, width=140, height=30).pack(side="right", padx=(0, s))
         self.tabla_mensual = Tabla(t_mov, [
             Columna("clave", "ID", oculta=True),
             Columna("fecha", "Fecha", 90, estirar=False),
@@ -242,6 +243,17 @@ class PantallaReportes(ctk.CTkFrame):
             messagebox.showerror("Error", f"No se pudieron eliminar {len(errores)} fila(s). Revisa app.log.")
         elif not bloqueados:
             self.app.toast.mostrar(f"{len(claves)} operación(es) eliminada(s)", "alerta")
+
+    def imprimir_boleta(self):
+        """PDF de la boleta seleccionada (o de la boleta a la que pertenece la línea seleccionada)."""
+        iid = self.tabla_mensual.iid_seleccionado()
+        if not iid:
+            return messagebox.showwarning("Atención", "Selecciona una boleta en la pestaña Movimientos.")
+        iid = self.tabla_mensual.padre(iid) or iid
+        clave = str(self.tabla_mensual.valores(iid)["clave"])
+        if not clave.startswith("B:"):
+            return messagebox.showwarning("Atención", "Los pagos de fiados no tienen boleta imprimible; selecciona una venta, fiado o ingreso.")
+        return self.app.imprimir_boleta(int(clave[2:]))
 
     def exportar_excel(self):
         nombre = f"movimientos_{self.anio}_{self.mes:02d}.xlsx"

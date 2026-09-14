@@ -21,8 +21,12 @@ messagebox.showerror = lambda t, m, **k: avisos.append(("error", m))
 messagebox.showinfo = lambda t, m, **k: avisos.append(("info", m))
 messagebox.askyesno = lambda t, m, **k: True
 
+from agro.servicios import sistema  # noqa: E402
 from agro.ui.app import Aplicacion  # noqa: E402
 from agro.ui.tema import COLOR  # noqa: E402
+
+abiertos = []
+sistema.abrir_archivo = lambda ruta: abiertos.append(ruta) or True  # no lanzar el visor de PDF
 
 app = Aplicacion(os.path.join(workdir, "prueba.db"))
 toasts = []
@@ -165,6 +169,14 @@ def t_finalizar_venta_y_fiado():
     assert db.productos.obtener("UREA").stock == 7 and len(db.boletas.deudas_pendientes()) == 1
     assert "JUAN" in toasts[-1][1] and ventas.seg_tipo.get() == "Contado"
     assert [fiados.tabla_deudores.valores(i)["cliente"] for i in fiados.tabla_deudores.iids()] == ["JUAN"]  # Fiados se refrescó sola
+    # imprimir la última boleta: PDF en boletas/ junto a la BD, abierto con el visor del sistema
+    assert ventas.ultima_boleta_id == 2 and ventas.btn_imprimir.cget("state") == "normal"
+    ruta = ventas.imprimir_ultima(); app.update()
+    assert ruta == os.path.join(workdir, "boletas", "boleta_000002.pdf") and os.path.exists(ruta) and abiertos == [ruta]
+    assert toasts[-1] == ("exito", "Boleta N° 000002 lista para imprimir")
+    with open(ruta, "rb") as f:
+        pdf = f.read()
+    assert pdf.startswith(b"%PDF") and b"Cliente: JUAN" in pdf and b"Saldo pendiente" in pdf
 
 def t_cobrar_deuda_ui():
     app.mostrar_pantalla("fiados"); app.update()
@@ -211,6 +223,17 @@ def t_compra_ui():
 
 def t_borrar_operacion_ui():
     app.mostrar_pantalla("reportes"); app.update()
+    reportes.tabla_mensual.deseleccionar(); reportes.imprimir_boleta()
+    assert avisos[-1][0] == "warn"
+    filas = {str(reportes.tabla_mensual.valores(i)["clave"]): i for i in reportes.tabla_mensual.iids()}
+    pago = next(i for c, i in filas.items() if c.startswith("P:")); boleta = next(i for c, i in filas.items() if c.startswith("B:"))
+    reportes.tabla_mensual.seleccionar_iid(pago); assert reportes.imprimir_boleta() is None and "pagos" in avisos[-1][1]
+    hijo = reportes.tabla_mensual.hijos(boleta)[0]
+    reportes.tabla_mensual.seleccionar_iid(hijo); n = len(abiertos)
+    ruta = reportes.imprimir_boleta(); app.update()
+    esperada = os.path.join(workdir, "boletas", f"boleta_{int(str(reportes.tabla_mensual.valores(boleta)['clave'])[2:]):06d}.pdf")
+    assert ruta == esperada and os.path.exists(ruta) and abiertos[n:] == [ruta], (ruta, avisos[-1])
+    reportes.tabla_mensual.deseleccionar()
     assert reportes.lbl_periodo.cget("text").split()[-1].isdigit() and reportes.f_filtros.winfo_manager() == ""  # filtros plegados
     # tarjetas: margen = vendido - costo actual; por cobrar total con subtexto del periodo
     assert reportes.card_margen.cget("text").startswith("MARGEN BRUTO") and "de este periodo" in reportes.card_por_cobrar.cget("text")
@@ -355,6 +378,10 @@ def t_navegacion_atajos_y_ajustes():
     from agro.preferencias import Preferencias
     assert Preferencias(db.db_name).get("apariencia") == "Dark"
     aj._cambiar_apariencia("Claro")
+    aj.campo_negocio_nombre.set("AGRO SAN JOSE"); aj.campo_negocio_ruc.set("20123456789"); aj.campo_negocio_direccion.set("Av. 1")
+    aj.guardar_negocio(); app.update()
+    assert Preferencias(db.db_name).get("negocio") == {"nombre": "AGRO SAN JOSE", "ruc": "20123456789", "direccion": "Av. 1"}
+    aj.refrescar(); assert aj.campo_negocio_ruc.get() == "20123456789"
     assert "Versión" in aj.lbl_acerca.cget("text") and "todavía" in aj.lbl_ultimo_respaldo.cget("text")
     app.mostrar_pantalla("inicio"); app.update()
     ini = app.pantallas["inicio"]

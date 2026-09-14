@@ -25,7 +25,8 @@ Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 
 main.py                    punto de entrada
 agro/config.py             constantes (ruta BD, CLIENTE_GENERAL, umbral de stock...)
 agro/registro.py           logger 'agro' -> app.log
-agro/preferencias.py       config.json junto a la BD: apariencia, geometría, último respaldo
+agro/preferencias.py       config.json junto a la BD: apariencia, geometría, último respaldo,
+                           negocio {nombre, ruc, direccion} para la boleta
 agro/db/                   SQLite. BaseDatos = Conexion + repositorios
    conexion.py             PRAGMAs, transaccion(), respaldo, introspección; llama a migraciones
    esquema.py              DDL actual (productos, clientes, proveedores, encargadas, boletas,
@@ -59,6 +60,8 @@ agro/servicios/            lógica de negocio sin Tk (sin pandas ni matplotlib e
    respaldos.py            respaldar_automatico(db) -> backups/negocio_YYYYMMDD_HHMMSS[_N].db junto a la
                            BD, rotación (CONSERVAR=10, solo los automáticos), listar_respaldos, carpeta_de
    sistema.py              abrir_archivo(ruta) con el programa del sistema (startfile / open / xdg-open)
+   boleta_pdf.py           generar(boleta, negocio, ruta): ticket PDF de 80 mm con reportlab (importado
+                           solo al generar); ruta_para(ruta_db, id) -> boletas/boleta_000012.pdf junto a la BD
 agro/ui/tema.py            tokens: COLOR (semánticos), ESPACIO, fuente(nombre),
                            aplicar_estilo_treeview(modo) para claro/oscuro
 agro/ui/componentes.py     Tabla (Treeview+scroll, filas dict, arbol=True), Columna,
@@ -68,12 +71,15 @@ agro/ui/app.py             Aplicacion: sidebar (NAVEGACION), encargada activa, a
                            F1-F8/Ctrl+B/Esc, apariencia, refrescos cruzados, app.toast. Respaldo:
                            respaldar_bd (manual), respaldo_automatico (al cerrar, nunca bloquea el
                            cierre), restaurar_bd / restaurar_desde(ruta) (confirma y antes guarda
-                           una copia automática de los datos actuales)
+                           una copia automática de los datos actuales). imprimir_boleta(id, abrir=True)
+                           genera el PDF y lo abre con el visor del sistema
 agro/ui/dialogos.py        calendario, alta rápida de contacto, elegir_opcion, historial de cliente
 agro/ui/pantallas/         una pantalla por archivo (inicio, fiados, inventario, contactos,
                            reportes, ajustes). Ventas y Compras son la misma clase
                            movimiento.PantallaMovimiento(modo="venta"|"compra"); agregar al
                            carrito pasa por dialogos.DialogoCantidad (no bloqueante, callback).
+                           procesar() guarda ultima_boleta_id y habilita "Imprimir última"; Reportes >
+                           Movimientos tiene "Imprimir boleta" para la fila seleccionada (solo claves B:).
                            Inventario y Contactos son maestro-detalle: tabla 65 % + panel 35 %
                            con un Formulario* (cargar/leer/enfocar); el alta reutiliza el mismo
                            formulario dentro de dialogos.DialogoFormulario.
@@ -126,8 +132,9 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 
 ## Hoja de ruta
 Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas; 5.1 hecho (reportes en SQL, sin pandas ni
-matplotlib; `tests/test_arranque.py` vigila que no vuelvan); 5.2 en curso: costo promedio ponderado
-e historial de precios (esquema v3) y respaldo automático con rotación hechos; falta la boleta imprimible.
+matplotlib; `tests/test_arranque.py` vigila que no vuelvan); 5.2 hecho (costo promedio ponderado e
+historial de precios con esquema v3, respaldo automático con rotación, boleta PDF imprimible).
+Siguiente: Prompt 6.1 (ejecutable para Windows).
 
 Rendimiento (BD de 20 000 líneas de `scripts/generar_datos_prueba.py`): importar `agro.ui.app`
 665 ms -> 152 ms; `ServicioReportes.generar` de un mes 545 ms -> 24 ms; `resumen_inicio` 31 -> 4 ms.

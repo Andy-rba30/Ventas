@@ -16,6 +16,7 @@ from agro.preferencias import Preferencias
 from agro.registro import log
 from agro.servicios.operaciones import ServicioOperaciones
 from agro.servicios.reportes import ServicioReportes
+from agro.servicios import boleta_pdf, sistema
 from agro.servicios.respaldos import respaldar_automatico
 from agro.ui import dialogos, tema
 from agro.ui.componentes import BotonNavegacion, Tabla, Toast, boton_secundario
@@ -239,6 +240,30 @@ class Aplicacion(ctk.CTk):
             log.error("Fallo al respaldar en %s: %s", fp, e)
             messagebox.showerror("Error", f"Fallo al respaldar: {e}")
             return False
+
+    def imprimir_boleta(self, boleta_id, abrir=True):
+        """Genera el PDF de la boleta en boletas/ junto a la BD y lo abre con el visor del sistema.
+        Devuelve la ruta o None si no se pudo."""
+        b = self.db.boletas.obtener(boleta_id)
+        if b is None:
+            messagebox.showwarning("Atención", "Esa boleta ya no existe.")
+            return None
+        ruta = boleta_pdf.ruta_para(self.db.db_name, b.id)
+        try:
+            boleta_pdf.generar(b, self.prefs.get("negocio"), ruta)
+        except ImportError:
+            log.error("reportlab no está instalado; no se puede generar la boleta PDF")
+            messagebox.showerror("Falta un componente", "Para imprimir boletas hace falta instalar reportlab:\n\n    pip install reportlab")
+            return None
+        except OSError as e:
+            log.error("Fallo al generar la boleta %s en %s: %s", boleta_id, ruta, e)
+            messagebox.showerror("Error", f"No se pudo guardar la boleta:\n{e}")
+            return None
+        log.info("Boleta #%s generada en %s", b.id, ruta)
+        if abrir and not sistema.abrir_archivo(ruta):
+            messagebox.showinfo("Boleta guardada", f"No se encontró un visor de PDF. La boleta quedó en:\n{ruta}")
+        self.toast.mostrar(f"Boleta N° {b.id:06d} lista para imprimir", "exito")
+        return ruta
 
     def restaurar_bd(self):
         fp = filedialog.askopenfilename(filetypes=[("SQLite DB", "*.db")], title="Selecciona el archivo")

@@ -1,4 +1,4 @@
-"""Pantalla Ajustes: encargadas, respaldo manual y automático, apariencia y acerca de."""
+"""Pantalla Ajustes: encargadas, datos del negocio, respaldo manual y automático, apariencia y acerca de."""
 import os
 from tkinter import messagebox
 
@@ -24,7 +24,7 @@ class PantallaAjustes(ctk.CTkFrame):
 
     def _construir(self):
         m, l = ESPACIO["m"], ESPACIO["l"]
-        Encabezado(self, "Ajustes", "Encargadas, respaldo de datos y apariencia").pack(fill="x", padx=l, pady=(l, m))
+        Encabezado(self, "Ajustes", "Encargadas, datos del negocio, respaldo de datos y apariencia").pack(fill="x", padx=l, pady=(l, m))
         self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.scroll.pack(fill="both", expand=True, padx=l - ESPACIO["s"], pady=(0, m))
 
@@ -43,6 +43,22 @@ class PantallaAjustes(ctk.CTkFrame):
         self.campo_encargada.entry.bind("<Return>", lambda e: self.agregar_encargada())
         boton_primario(acciones, "Agregar", self.agregar_encargada, width=160).pack(anchor="w", pady=(0, ESPACIO["s"]))
         boton_peligro(acciones, "Quitar seleccionada", self.quitar_encargada, width=160).pack(anchor="w")
+
+        # --- Datos del negocio ---
+        sec = Seccion(self.scroll, "Datos del negocio", "Aparecen en la cabecera de la boleta imprimible (PDF de 80 mm). "
+                                                        "Si el nombre queda vacío se usa el nombre del programa.")
+        sec.pack(fill="x", pady=(0, m))
+        fila = ctk.CTkFrame(sec.cuerpo, fg_color="transparent")
+        fila.pack(fill="x")
+        self.campo_negocio_nombre = Campo(fila, "Nombre:", ancho=300)
+        self.campo_negocio_nombre.pack(side="left", padx=(0, m))
+        self.campo_negocio_ruc = Campo(fila, "RUC:", ancho=140)
+        self.campo_negocio_ruc.pack(side="left")
+        fila2 = ctk.CTkFrame(sec.cuerpo, fg_color="transparent")
+        fila2.pack(fill="x", pady=(ESPACIO["s"], 0))
+        self.campo_negocio_direccion = Campo(fila2, "Dirección:", ancho=480)
+        self.campo_negocio_direccion.pack(side="left", padx=(0, m))
+        boton_primario(fila2, "Guardar datos", self.guardar_negocio, width=140).pack(side="left")
 
         # --- Respaldo ---
         sec = Seccion(self.scroll, "Respaldo", "Guarda una copia de la base de datos en la carpeta que elijas, o restaura una copia anterior. "
@@ -98,6 +114,10 @@ class PantallaAjustes(ctk.CTkFrame):
         self.lbl_ultimo_respaldo.configure(
             text=f"Último respaldo: {ultimo['fecha']}  →  {ultimo['ruta']}" if ultimo else "Último respaldo: todavía no se ha hecho ninguno.")
         self.refrescar_respaldos()
+        negocio = self.app.prefs.get("negocio")
+        self.campo_negocio_nombre.set(negocio["nombre"])
+        self.campo_negocio_ruc.set(negocio["ruc"])
+        self.campo_negocio_direccion.set(negocio["direccion"])
         self.seg_apariencia.set(_NOMBRE_APARIENCIA.get(self.app.prefs.get("apariencia"), "Claro"))
         self.lbl_acerca.configure(text=f"{NOMBRE_APP}\nVersión {__version__}\nRegistro de actividad: {os.path.join(os.path.dirname(ruta), 'app.log')}")
 
@@ -134,6 +154,11 @@ class PantallaAjustes(ctk.CTkFrame):
             if self.app.db.contactos.eliminar_encargada(nombre):
                 self.app.actualizar_encargadas()
                 self.refrescar()
+
+    def guardar_negocio(self):
+        self.app.prefs.set("negocio", {"nombre": self.campo_negocio_nombre.get(), "ruc": self.campo_negocio_ruc.get(),
+                                       "direccion": self.campo_negocio_direccion.get()})
+        self.app.toast.mostrar("Datos del negocio guardados", "exito")
 
     def _respaldar(self):
         self.app.respaldar_bd()

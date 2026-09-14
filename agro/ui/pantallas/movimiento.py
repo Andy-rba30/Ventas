@@ -111,6 +111,11 @@ class PantallaMovimiento(ctk.CTkFrame):
 
         acciones = ctk.CTkFrame(f_der, fg_color="transparent")
         acciones.pack(fill="x", padx=m, pady=(s, 0))
+        self.ultima_boleta_id = None
+        self.btn_imprimir = boton_secundario(acciones, "🖨 Imprimir última", self.imprimir_ultima, width=130, height=28,
+                                             font=fuente("pequeña"), state="disabled")
+        self.btn_imprimir.pack(side="left")
+        Tooltip(self.btn_imprimir, "Genera el PDF (80 mm) de la última boleta registrada en esta pantalla y lo abre para imprimir.")
         boton_peligro(acciones, "Vaciar", self.vaciar_carrito, width=80, height=28, font=fuente("pequeña")).pack(side="right")
         boton_secundario(acciones, "Quitar", self.quitar_linea, width=80, height=28, font=fuente("pequeña")).pack(side="right", padx=(0, ESPACIO["xs"]))
 
@@ -331,11 +336,11 @@ class PantallaMovimiento(ctk.CTkFrame):
         try:
             if self.es_venta:
                 fiado = self.es_fiado()
-                self.app.operaciones.registrar_venta(self.carrito, self.ent_fecha.get(), self.app.encargada_actual(), persona, fiado=fiado)
+                boleta_id = self.app.operaciones.registrar_venta(self.carrito, self.ent_fecha.get(), self.app.encargada_actual(), persona, fiado=fiado)
                 mensaje = f"{'Fiado' if fiado else 'Venta'} registrado: {moneda(total)}" + (f" a {persona}" if fiado else "")
             else:
                 fiado = False
-                self.app.operaciones.registrar_compra(self.carrito, self.ent_fecha.get(), self.app.encargada_actual(), persona)
+                boleta_id = self.app.operaciones.registrar_compra(self.carrito, self.ent_fecha.get(), self.app.encargada_actual(), persona)
                 mensaje = f"Ingreso registrado: {moneda(total)} de {persona}"
         except ErrorOperacion as e:
             messagebox.showwarning("Atención", str(e))
@@ -344,6 +349,8 @@ class PantallaMovimiento(ctk.CTkFrame):
             log.error("Fallo al registrar %s: %s", self.modo, e)
             messagebox.showerror("Error", f"No se guardó la operación (ningún stock fue modificado):\n{e}")
             return False
+        self.ultima_boleta_id = boleta_id
+        self.btn_imprimir.configure(state="normal")
         self.vaciar_carrito()
         self.ent_buscar.delete(0, tk.END)
         self.ultimo_producto = None
@@ -356,6 +363,12 @@ class PantallaMovimiento(ctk.CTkFrame):
         self.app.toast.mostrar(mensaje, "exito")
         self.ent_buscar.focus_set()
         return True
+
+    def imprimir_ultima(self):
+        if self.ultima_boleta_id is None:
+            messagebox.showwarning("Atención", "Todavía no se registró ninguna boleta en esta pantalla.")
+            return None
+        return self.app.imprimir_boleta(self.ultima_boleta_id)
 
     # ------------------------------------------------------------------ contactos
     def _nueva_persona(self):

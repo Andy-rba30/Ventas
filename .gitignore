@@ -12,3 +12,5 @@ build/
 *.db-shm
 *.log
 backups/
+boletas/
+config.json
