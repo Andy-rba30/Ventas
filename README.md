@@ -23,7 +23,7 @@ python main.py
 
 ## Estructura
 
-- `agro/db/`: SQLite (conexión, esquema versionado y migraciones, repositorios de productos, boletas/pagos y contactos).
+- `agro/db/`: SQLite (conexión, esquema versionado y migraciones, repositorios de productos, boletas/pagos, contactos e historial de precios).
 - `agro/servicios/`: lógica de negocio sin interfaz (carrito, operaciones, reportes, formato).
 - `agro/ui/`: ventana principal, diálogos y una pantalla por archivo.
 - `tests/`: pruebas pytest de datos y servicios con SQLite en memoria (`pip install -r requirements-dev.txt && pytest`).
@@ -45,11 +45,11 @@ y Supr quita la línea seleccionada del carrito.
 | Pantalla    | Qué hace |
 |-------------|----------|
 | Ventas      | Buscar producto, doble clic o Enter para elegir cantidad (acepta 1/2), carrito editable, un solo botón Cobrar / Registrar fiado con el monto |
-| Compras     | Misma pantalla que Ventas en modo compra: cantidad y costo unitario por línea, actualiza stock y costo de referencia |
+| Compras     | Misma pantalla que Ventas en modo compra: cantidad y costo unitario por línea, suma stock y recalcula el costo del producto como promedio ponderado |
 | Contactos   | Maestro-detalle: tabla a la izquierda, ficha editable a la derecha (documento, teléfono, notas), deuda pendiente y acceso a sus fiados |
 | Fiados      | Deudores con días de antigüedad; por cliente, sus boletas con saldo, pagos parciales o totales con fecha, encargada y nota, e historial de pagos |
-| Inventario  | Maestro-detalle: tabla con unidad, stock, mínimo, precios y margen; ficha editable; desactivar/reactivar; ver inactivos |
-| Reportes    | Selector de mes con filtros plegables (día, cliente, proveedor, tipo); pestaña Resumen (caja, compras, margen bruto, por cobrar, movimiento por producto) y pestaña Movimientos (boletas con líneas, exportar Excel, eliminar) |
+| Inventario  | Maestro-detalle: tabla con unidad, stock, mínimo, precios y margen; ficha editable con historial de precios de compra y venta; desactivar/reactivar; ver inactivos |
+| Reportes    | Selector de mes con filtros plegables (día, cliente, proveedor, tipo); pestaña Resumen (caja, compras, margen bruto calculado con el costo vigente en cada venta, por cobrar, movimiento por producto) y pestaña Movimientos (boletas con líneas, exportar Excel, eliminar) |
 | Inicio      | Ventas de hoy, fiados pendientes, productos bajo mínimo, listas de reposición y fiados con más de 30 días, accesos a Nueva venta / Ingreso de mercadería |
 | Ajustes     | Encargadas, respaldo y restauración, apariencia (claro/oscuro/sistema) y versión |
 

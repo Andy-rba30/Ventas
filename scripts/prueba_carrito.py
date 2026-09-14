@@ -201,7 +201,7 @@ def t_compra_ui():
     assert compras.carrito[0].precio_unit == 110 and compras.btn_procesar.cget("text").endswith("S/. 1100.00")
     n = len(toasts); assert compras.procesar() is True; app.update()
     p = db.productos.obtener("UREA")
-    assert compras.carrito.vacio and p.stock == 17 and p.precio_compra == 110.0, p
+    assert compras.carrito.vacio and p.stock == 17 and p.precio_compra == 105.8824, p  # (7*100 + 10*110) / 17
     assert toasts[n:] and "AGROSUR" in toasts[-1][1]
     inv = app.pantallas["productos"].tabla_productos
     assert any(inv.valores(i)["producto"] == "UREA" and float(inv.valores(i)["stock"]) == 17 for i in inv.iids())
@@ -287,7 +287,7 @@ def t_inventario_maestro_detalle():
     inv = app.pantallas["productos"]
     assert inv.seleccionado is None and not inv.panel.winfo_ismapped()
     fila = inv.tabla_productos.valores(inv.tabla_productos.iids()[0])
-    assert fila["producto"] == "UREA" and fila["unidad"] == "saco" and fila["margen"] == "8 %"  # (120-110)/120
+    assert fila["producto"] == "UREA" and fila["unidad"] == "saco" and fila["margen"] == "12 %"  # (120-105.88)/120
     # alta por diálogo con validación
     dlg = inv.nuevo_producto(); app.update()
     dlg.formulario.nombre.set("guano"); dlg.formulario.precio_venta.set("0"); dlg.formulario.stock.set("100")

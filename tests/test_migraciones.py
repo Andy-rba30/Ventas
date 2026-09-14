@@ -59,7 +59,7 @@ def migrada(tmp_path):
 
 def test_version_y_respaldo_previo(migrada):
     db, tmp_path = migrada
-    assert db.version_esquema() == VERSION_ESQUEMA == 2
+    assert db.version_esquema() == VERSION_ESQUEMA == 3
     copias = os.listdir(tmp_path / "backups")
     assert len(copias) == 1 and copias[0].startswith("negocio_pre_migracion_")
     vieja = sqlite3.connect(str(tmp_path / "backups" / copias[0]))
@@ -126,7 +126,7 @@ def test_reabrir_no_vuelve_a_migrar(migrada):
     db.cerrar()
     otra = BaseDatos(ruta)
     try:
-        assert otra.version_esquema() == 2
+        assert otra.version_esquema() == 3
         assert len(os.listdir(tmp_path / "backups")) == 1  # sin segunda copia
         assert otra.cursor.execute("SELECT count(*) FROM boletas").fetchone()[0] == 5
     finally:
@@ -138,7 +138,7 @@ def test_migracion_desde_esquema_muy_antiguo_sin_columnas_nuevas(tmp_path):
     _bd_legacy(ruta, con_columnas_nuevas=False)
     db = BaseDatos(ruta)
     try:
-        assert db.version_esquema() == 2
+        assert db.version_esquema() == 3
         b = db.boletas.obtener(1)
         assert b.tipo == "VENTA" and b.cliente == "" and b.total == 120 and b.estado == "PAGADO"
     finally:
@@ -148,18 +148,18 @@ def test_migracion_desde_esquema_muy_antiguo_sin_columnas_nuevas(tmp_path):
 def test_bd_nueva_se_crea_directamente_en_v1(tmp_path):
     db = BaseDatos(str(tmp_path / "nueva.db"))
     try:
-        assert db.version_esquema() == 2
+        assert db.version_esquema() == 3
         assert not db.tabla_existe("_legacy_transacciones") and not (tmp_path / "backups").exists()
         assert db.contactos.encargadas() == ["Administradora"] and db.contactos.nombres("cliente") == ["PÚBLICO GENERAL"]
         assert {"boletas", "boleta_lineas", "pagos"} <= {r[0] for r in db.cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         indices = {r[0] for r in db.cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")}
-        assert len(indices) == 6
+        assert len(indices) == 7
     finally:
         db.cerrar()
 
 
-def test_migracion_v1_a_v2_agrega_notas(tmp_path):
-    """Una BD que ya estaba en v1 (sin notas) pasa a v2 con una sola copia previa."""
+def test_migracion_desde_v1_agrega_notas_y_costo(tmp_path):
+    """Una BD que quedó en v1 (sin notas ni costo_unit) llega a la versión actual con una sola copia previa."""
     ruta = str(tmp_path / "v1.db")
     _bd_legacy(ruta)
     db = BaseDatos(ruta); db.cerrar()                 # v0 -> v2 (dos pasos, una copia)
@@ -169,8 +169,9 @@ def test_migracion_v1_a_v2_agrega_notas(tmp_path):
     c.commit(); c.close()
     db = BaseDatos(ruta)
     try:
-        assert db.version_esquema() == 2
+        assert db.version_esquema() == 3
         assert "notas" in db.columnas_de("clientes") and "notas" in db.columnas_de("proveedores")
+        assert "costo_unit" in db.columnas_de("boleta_lineas") and db.tabla_existe("precios_historial")
         assert db.contactos.obtener("cliente", "JUAN").notas == ""
         assert db.cursor.execute("SELECT count(*) FROM boletas").fetchone()[0] == 5  # los datos v1 siguen ahí
         assert len(os.listdir(tmp_path / "backups")) == 2  # copia del v0->v2 y copia del v1->v2
@@ -179,4 +180,4 @@ def test_migracion_v1_a_v2_agrega_notas(tmp_path):
 
 
 def test_bd_en_memoria_no_intenta_respaldar(db):
-    assert db.version_esquema() == 2
+    assert db.version_esquema() == 3

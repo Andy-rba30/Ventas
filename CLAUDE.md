@@ -29,13 +29,17 @@ agro/preferencias.py       config.json junto a la BD: apariencia, geometría, ú
 agro/db/                   SQLite. BaseDatos = Conexion + repositorios
    conexion.py             PRAGMAs, transaccion(), respaldo, introspección; llama a migraciones
    esquema.py              DDL actual (productos, clientes, proveedores, encargadas, boletas,
-                           boleta_lineas, pagos) + índices. VERSION_ESQUEMA (=2) en PRAGMA user_version
+                           boleta_lineas con costo_unit, pagos, precios_historial) + índices.
+                           VERSION_ESQUEMA (=3) en PRAGMA user_version
    migraciones.py          pasos encadenados _PASOS[version]: v0 (tabla plana) -> v1 (boletas),
-                           v1 -> v2 (notas en contactos). Copia previa en backups/ con la versión
-                           de origen en el nombre; la tabla vieja queda como _legacy_transacciones
-   productos.py            db.productos.*  (dataclass Producto; no se borran: se desactivan)
-   boletas.py              db.boletas.*    (Boleta, LineaBoleta, Pago; pagos parciales;
-                           eliminar_boleta/linea/pago con reversión de stock)
+                           v1 -> v2 (notas en contactos), v2 -> v3 (costo_unit por línea y
+                           precios_historial). Copia previa en backups/ con la versión de origen
+                           en el nombre; la tabla vieja queda como _legacy_transacciones
+   productos.py            db.productos.*  (dataclass Producto; no se borran: se desactivan;
+                           agregar/modificar anotan los precios en db.precios)
+   precios.py              db.precios.*    (PrecioHistorico; registrar, historial, ultimo)
+   boletas.py              db.boletas.*    (Boleta, LineaBoleta con costo_unit, Pago; pagos
+                           parciales; eliminar_boleta/linea/pago con reversión de stock)
    contactos.py            db.contactos.*  (dataclass Contacto con notas; obtener/modificar;
                            clientes, proveedores y encargadas con historial se desactivan)
    reportes.py             db.reportes.*   consultas agregadas por Filtro(anio, mes, dia, cliente,
@@ -44,7 +48,11 @@ agro/db/                   SQLite. BaseDatos = Conexion + repositorios
 agro/servicios/            lógica de negocio sin Tk (sin pandas ni matplotlib en todo el paquete)
    formato.py              moneda(), cantidad(), parse_cantidad(), MESES
    carrito.py              Carrito / LineaCarrito
-   operaciones.py          ServicioOperaciones: venta, fiado, compra, cobro, eliminar
+   costos.py               costo_promedio() ponderado (función pura)
+   operaciones.py          ServicioOperaciones: venta, fiado, compra, cobro, eliminar.
+                           registrar_venta/compra devuelven el id de la boleta; la venta guarda
+                           en cada línea el costo promedio vigente y la compra recalcula
+                           productos.precio_compra como promedio ponderado
    reportes.py             ServicioReportes: Reporte por periodo sobre db.reportes, resumen_inicio,
                            exportar_excel (delegado a exportar.py)
    exportar.py             Excel con openpyxl (se importa solo al exportar)
@@ -112,8 +120,8 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 
 ## Hoja de ruta
 Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas; 5.1 hecho (reportes en SQL, sin pandas ni
-matplotlib; `tests/test_arranque.py` vigila que no vuelvan). Siguiente: Prompt 5.2 (costo promedio,
-historial de precios, respaldo automático, boleta imprimible).
+matplotlib; `tests/test_arranque.py` vigila que no vuelvan); 5.2 en curso: costo promedio ponderado
+e historial de precios (esquema v3) hecho; faltan respaldo automático y boleta imprimible.
 
 Rendimiento (BD de 20 000 líneas de `scripts/generar_datos_prueba.py`): importar `agro.ui.app`
 665 ms -> 152 ms; `ServicioReportes.generar` de un mes 545 ms -> 24 ms; `resumen_inicio` 31 -> 4 ms.

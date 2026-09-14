@@ -14,14 +14,14 @@ def _boletas(db):
 
 def test_venta_crea_una_boleta_con_todas_las_lineas(con_datos, ops):
     c = carrito(("UREA", 120, 2), ("FOSFATO", 90, 0.5), ("UREA", 120, 1))
-    assert ops.registrar_venta(c, "2026-09-05", "Administradora", "PÚBLICO GENERAL") == "VENTA"
+    assert ops.registrar_venta(c, "2026-09-05", "Administradora", "PÚBLICO GENERAL") == 1
     assert con_datos.productos.obtener("UREA").stock == 7
     assert con_datos.productos.obtener("FOSFATO").stock == 4.5
     assert _boletas(con_datos) == [(1, "VENTA", 405, "PAGADO")]
     b = con_datos.boletas.obtener(1)
     assert b.cliente == "PÚBLICO GENERAL" and b.encargada == "Administradora" and b.fecha == "2026-09-05"
-    assert [(l.producto, l.cantidad, l.precio_unit, l.subtotal, l.stock_resultante) for l in b.lineas] == [
-        ("UREA", 2, 120, 240, 8), ("FOSFATO", 0.5, 90, 45, 4.5), ("UREA", 1, 120, 120, 7)]
+    assert [(l.producto, l.cantidad, l.precio_unit, l.subtotal, l.stock_resultante, l.costo_unit) for l in b.lineas] == [
+        ("UREA", 2, 120, 240, 8, 100), ("FOSFATO", 0.5, 90, 45, 4.5, 70), ("UREA", 1, 120, 120, 7, 100)]
 
 
 def test_venta_con_subtotal_editado_registra_el_subtotal(con_datos, ops):
@@ -85,10 +85,11 @@ def test_venta_es_atomica_si_falla_la_boleta(con_datos, ops, monkeypatch):
 
 # --- compras ----------------------------------------------------------------
 
-def test_compra_suma_stock_y_actualiza_costo(con_datos, ops):
+def test_compra_suma_stock_y_promedia_el_costo(con_datos, ops):
     boleta_id = ops.registrar_compra(carrito(("UREA", 95, 20)), "2026-09-04", "Administradora", "AGROSUR")
     p = con_datos.productos.obtener("UREA")
-    assert p.stock == 30 and p.precio_compra == 95
+    # 10 unidades a 100 + 20 a 95 -> (1000 + 1900) / 30 = 96.6667
+    assert p.stock == 30 and p.precio_compra == 96.6667
     b = con_datos.boletas.obtener(boleta_id)
     assert (b.tipo, b.proveedor, b.estado, b.total, b.cliente) == ("ENTRADA", "AGROSUR", "PAGADO", 1900, "")
 

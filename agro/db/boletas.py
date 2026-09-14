@@ -28,6 +28,7 @@ class LineaBoleta:
     precio_unit: float
     subtotal: float
     stock_resultante: float | None
+    costo_unit: float | None = None   # costo promedio del producto al momento de la venta (v3)
 
 
 @dataclass
@@ -88,8 +89,8 @@ class RepositorioBoletas:
     # --- creación -----------------------------------------------------------
     def crear(self, fecha, tipo, encargada_id, lineas, cliente_id=None, proveedor_id=None, hora=None, estado=None, notas=""):
         """Inserta la boleta y sus líneas. `lineas`: iterable de tuplas
-        (producto_id, cantidad, precio_unit, subtotal, stock_resultante). Devuelve el id."""
-        lineas = list(lineas)
+        (producto_id, cantidad, precio_unit, subtotal, stock_resultante[, costo_unit]). Devuelve el id."""
+        lineas = [tuple(l) + (None,) * (6 - len(l)) for l in lineas]
         if not lineas:
             raise ValueError("Una boleta necesita al menos una línea")
         hora = hora or datetime.datetime.now().strftime("%H:%M:%S")
@@ -102,9 +103,10 @@ class RepositorioBoletas:
             """, (str(fecha), hora, tipo, cliente_id, proveedor_id, encargada_id, total, estado, notas))
             boleta_id = self.cx.cursor.lastrowid
             self.cx.cursor.executemany("""
-                INSERT INTO boleta_lineas (boleta_id, producto_id, cantidad, precio_unit, subtotal, stock_resultante)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, [(boleta_id, pid, float(cant), float(pu), float(sub), sr) for pid, cant, pu, sub, sr in lineas])
+                INSERT INTO boleta_lineas (boleta_id, producto_id, cantidad, precio_unit, subtotal, stock_resultante, costo_unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, [(boleta_id, pid, float(cant), float(pu), float(sub), sr, None if cu is None else float(cu))
+                  for pid, cant, pu, sub, sr, cu in lineas])
         return boleta_id
 
     # --- consulta -----------------------------------------------------------
@@ -118,7 +120,7 @@ class RepositorioBoletas:
 
     def lineas_de(self, boleta_id):
         return [LineaBoleta(*r) for r in self.cx.cursor.execute("""
-            SELECT l.id, l.boleta_id, l.producto_id, p.nombre, l.cantidad, l.precio_unit, l.subtotal, l.stock_resultante
+            SELECT l.id, l.boleta_id, l.producto_id, p.nombre, l.cantidad, l.precio_unit, l.subtotal, l.stock_resultante, l.costo_unit
             FROM boleta_lineas l JOIN productos p ON p.id = l.producto_id
             WHERE l.boleta_id=? ORDER BY l.id
         """, (boleta_id,))]

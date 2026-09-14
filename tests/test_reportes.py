@@ -129,11 +129,12 @@ def test_filtro_por_tipo(con_movimientos, ops, reportes):
     assert reportes.generar(2026, 9, tipo="FIADO", proveedor="AGROSUR").vacio
 
 
-def test_margen_bruto_usa_costo_actual_del_producto(con_movimientos, reportes):
+def test_margen_bruto_usa_el_costo_de_cada_linea_al_vender(con_movimientos, reportes):
     rep = reportes.generar(2026, 9)
-    # vendido: UREA 2 + FOSFATO 1 (contado) + UREA 1 (fiado) = 240 + 90 + 120 = 450
-    # costo: la compra del día 4 dejó precio_compra de UREA en 95; FOSFATO sigue en 70 -> 3*95 + 1*70 = 355
-    assert rep.ventas == 450 and rep.costo_vendido == 355 and rep.margen_bruto == 95
+    # vendido: UREA 2 + FOSFATO 1 (contado, día 2) + UREA 1 (fiado, día 6) = 240 + 90 + 120 = 450
+    # costo día 2: UREA 100, FOSFATO 70 -> 270. Compra día 4: 8 a 100 + 20 a 95 -> promedio 96.4286.
+    # costo día 6: 1 x 96.4286. Total 366.43; margen 83.57
+    assert rep.ventas == 450 and rep.costo_vendido == 366.43 and rep.margen_bruto == 83.57
     assert reportes.generar(2026, 9, tipo="ENTRADA").margen_bruto == 0
 
 

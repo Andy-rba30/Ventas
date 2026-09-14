@@ -5,7 +5,7 @@ Versionado con PRAGMA user_version. La versión 0 es el esquema heredado (tabla
 """
 from agro.config import CLIENTE_GENERAL, ENCARGADA_DEFAULT, UMBRAL_BAJO_STOCK
 
-VERSION_ESQUEMA = 2  # v2: notas en clientes y proveedores
+VERSION_ESQUEMA = 3  # v2: notas en contactos · v3: costo_unit por línea y precios_historial
 
 TABLAS = [
     f"""
@@ -64,7 +64,17 @@ TABLAS = [
         cantidad REAL NOT NULL,
         precio_unit REAL NOT NULL,
         subtotal REAL NOT NULL,
-        stock_resultante REAL
+        stock_resultante REAL,
+        costo_unit REAL
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS precios_historial (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto_id INTEGER NOT NULL REFERENCES productos(id),
+        fecha TEXT NOT NULL,
+        hora TEXT NOT NULL,
+        tipo TEXT NOT NULL CHECK (tipo IN ('compra', 'venta')),
+        precio REAL NOT NULL
     )""",
     """
     CREATE TABLE IF NOT EXISTS pagos (
@@ -85,6 +95,7 @@ INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_lineas_boleta ON boleta_lineas(boleta_id)",
     "CREATE INDEX IF NOT EXISTS idx_lineas_producto ON boleta_lineas(producto_id)",
     "CREATE INDEX IF NOT EXISTS idx_pagos_boleta ON pagos(boleta_id)",
+    "CREATE INDEX IF NOT EXISTS idx_precios_producto ON precios_historial(producto_id)",
 ]
 
 

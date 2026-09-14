@@ -132,6 +132,14 @@ class PantallaInventario(ctk.CTkFrame):
         self.btn_guardar.pack(fill="x", pady=(s, ESPACIO["xs"]))
         self.btn_estado = boton_enlace(self.panel, "Desactivar producto", self.alternar_activo)
         self.btn_estado.pack(anchor="w")
+        ctk.CTkLabel(self.panel, text="Historial de precios (el costo de compra es el promedio ponderado)", font=fuente("pequeña"),
+                     text_color=COLOR["texto_suave"], anchor="w").pack(fill="x", pady=(s, 0))
+        self.tabla_historial = Tabla(self.panel, [
+            Columna("fecha", "Fecha", 90, estirar=False),
+            Columna("tipo", "Tipo", 70, "center", estirar=False),
+            Columna("precio", "Precio", 90, "e"),
+        ], alto=5)
+        self.tabla_historial.pack(fill="x")
         self._mostrar_panel(False)
 
     def _mostrar_panel(self, visible):
@@ -188,6 +196,9 @@ class PantallaInventario(ctk.CTkFrame):
         self.seleccionado = p.nombre
         self.formulario.cargar(p)
         self.lbl_titulo_panel.configure(text=p.nombre)
+        self.tabla_historial.cargar(
+            {"fecha": h.fecha, "tipo": "Compra" if h.tipo == "compra" else "Venta", "precio": moneda(h.precio)}
+            for h in self.app.db.precios.historial(p.id, limite=10))
         if p.activo:
             self.lbl_estado.configure(text="Activo" + (" · bajo el stock mínimo" if p.bajo_stock else ""),
                                       text_color=COLOR["peligro_hover"] if p.bajo_stock else COLOR["texto_suave"])

@@ -50,6 +50,14 @@ def _migrar_v1_a_v2(cx):
             cx.cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN notas TEXT NOT NULL DEFAULT ''")
 
 
+def _migrar_v2_a_v3(cx):
+    """v3: costo unitario al momento de la venta en cada línea (NULL en las antiguas: el
+    reporte usa entonces el precio_compra actual) y tabla precios_historial."""
+    if "costo_unit" not in cx.columnas_de("boleta_lineas"):
+        cx.cursor.execute("ALTER TABLE boleta_lineas ADD COLUMN costo_unit REAL")
+    crear_esquema(cx.cursor)  # crea precios_historial y su índice si faltan
+
+
 def _respaldar_antes_de_migrar(cx, version_origen):
     if cx.db_name == ":memory:":
         return None
@@ -189,4 +197,4 @@ def _migrar_v0_a_v1(cx):
 
 
 # Versión de origen -> función que la lleva a la siguiente.
-_PASOS = {0: _migrar_v0_a_v1, 1: _migrar_v1_a_v2}
+_PASOS = {0: _migrar_v0_a_v1, 1: _migrar_v1_a_v2, 2: _migrar_v2_a_v3}

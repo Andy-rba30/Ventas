@@ -53,7 +53,7 @@ def test_excepcion_en_anidada_revierte_todo(db):
 
 
 def test_introspeccion(db):
-    assert db.version_esquema() == 2
+    assert db.version_esquema() == 3
     assert db.tabla_existe("boletas") and not db.tabla_existe("transacciones")
     assert {"id", "nombre", "unidad", "precio_venta", "stock_minimo", "activo"} <= db.columnas_de("productos")
     assert "notas" in db.columnas_de("clientes") and "notas" in db.columnas_de("proveedores")

@@ -44,31 +44,53 @@ class RepositorioProductos:
         """Crea el producto. Si ya existe activo devuelve False; si existe inactivo lo reactiva
         con los nuevos datos y devuelve True."""
         existente = self.obtener(nombre, incluir_inactivos=True)
-        if existente is not None:
-            if existente.activo:
-                return False
-            self.cx.cursor.execute(
-                "UPDATE productos SET unidad=?, precio_venta=?, precio_compra=?, stock=?, stock_minimo=?, activo=1 WHERE id=?",
-                (unidad, precio_venta, precio_compra, stock, stock_minimo, existente.id))
-            log.info("Producto '%s' reactivado", nombre)
-            return True
-        self.cx.cursor.execute(
-            "INSERT INTO productos (nombre, unidad, precio_venta, precio_compra, stock, stock_minimo) VALUES (?, ?, ?, ?, ?, ?)",
-            (nombre, unidad, precio_venta, precio_compra, stock, stock_minimo))
+        with self.cx.transaccion():
+            if existente is not None:
+                if existente.activo:
+                    return False
+                self.cx.cursor.execute(
+                    "UPDATE productos SET unidad=?, precio_venta=?, precio_compra=?, stock=?, stock_minimo=?, activo=1 WHERE id=?",
+                    (unidad, precio_venta, precio_compra, stock, stock_minimo, existente.id))
+                producto_id = existente.id
+                log.info("Producto '%s' reactivado", nombre)
+            else:
+                self.cx.cursor.execute(
+                    "INSERT INTO productos (nombre, unidad, precio_venta, precio_compra, stock, stock_minimo) VALUES (?, ?, ?, ?, ?, ?)",
+                    (nombre, unidad, precio_venta, precio_compra, stock, stock_minimo))
+                producto_id = self.cx.cursor.lastrowid
+            self._anotar_precio(producto_id, "venta", precio_venta)
+            if precio_compra:
+                self._anotar_precio(producto_id, "compra", precio_compra)
         return True
+
+    def _anotar_precio(self, producto_id, tipo, precio):
+        """Fila en precios_historial (la consulta vive en RepositorioPrecios; aquí solo se escribe)."""
+        import datetime
+        ahora = datetime.datetime.now()
+        self.cx.cursor.execute("INSERT INTO precios_historial (producto_id, fecha, hora, tipo, precio) VALUES (?, ?, ?, ?, ?)",
+                               (producto_id, ahora.date().isoformat(), ahora.strftime("%H:%M:%S"), tipo, float(precio)))
 
     def modificar(self, nombre_actual, nuevo_nombre, precio_venta, precio_compra, stock=None, unidad=None, stock_minimo=None):
         """Actualiza datos (y nombre) del producto. El historial no cambia porque referencia el id.
         Devuelve False si el nuevo nombre ya pertenece a otro producto."""
         try:
+            actual = self.obtener(nombre_actual, incluir_inactivos=True)
+            if actual is None:
+                return False
             campos = ["nombre=?", "precio_venta=?", "precio_compra=?"]
             valores = [nuevo_nombre, precio_venta, precio_compra]
             if stock is not None: campos.append("stock=?"); valores.append(stock)
             if unidad is not None: campos.append("unidad=?"); valores.append(unidad)
             if stock_minimo is not None: campos.append("stock_minimo=?"); valores.append(stock_minimo)
             valores.append(nombre_actual)
-            self.cx.cursor.execute(f"UPDATE productos SET {', '.join(campos)} WHERE nombre=?", valores)
-            return self.cx.cursor.rowcount > 0
+            with self.cx.transaccion():
+                self.cx.cursor.execute(f"UPDATE productos SET {', '.join(campos)} WHERE nombre=?", valores)
+                # Solo los cambios de precio dejan huella en el historial.
+                if float(precio_venta) != actual.precio_venta:
+                    self._anotar_precio(actual.id, "venta", precio_venta)
+                if float(precio_compra) != actual.precio_compra:
+                    self._anotar_precio(actual.id, "compra", precio_compra)
+            return True
         except sqlite3.IntegrityError:
             log.warning("No se pudo renombrar '%s' a '%s': el nombre ya existe", nombre_actual, nuevo_nombre)
             return False

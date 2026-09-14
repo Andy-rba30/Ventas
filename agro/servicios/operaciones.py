@@ -10,6 +10,7 @@ Claves de operación (para eliminar desde el reporte): "B:<id>" boleta completa,
 from agro.config import CLIENTE_GENERAL
 from agro.db.boletas import ERROR, TIENE_PAGOS
 from agro.registro import log
+from agro.servicios.costos import costo_promedio
 from agro.servicios.formato import hora_actual
 
 
@@ -26,24 +27,22 @@ class ServicioOperaciones:
     def __init__(self, db):
         self.db = db
 
-    def _lineas_con_stock(self, carrito, operacion):
-        """Ajusta el stock de cada línea y devuelve las tuplas para RepositorioBoletas.crear.
-        Las líneas de productos que ya no existen (o están inactivos) se omiten."""
-        lineas = []
+    def _productos_del_carrito(self, carrito):
+        """[(linea, Producto)] omitiendo los productos que ya no existen o están inactivos."""
+        pares = []
         for linea in carrito:
             p = self.db.productos.obtener(linea.producto)
             if p is None:
                 log.warning("Línea omitida: el producto '%s' no existe o está inactivo", linea.producto)
                 continue
-            nuevo_stock = self.db.productos.ajustar_stock(p.nombre, linea.cantidad, operacion)
-            lineas.append((p.id, linea.cantidad, linea.precio_unit, linea.subtotal, nuevo_stock))
-        if not lineas:
+            pares.append((linea, p))
+        if not pares:
             raise ErrorOperacion("Ninguno de los productos del carrito existe en el inventario.")
-        return lineas
+        return pares
 
     def registrar_venta(self, carrito, fecha, encargada, cliente, fiado=False):
-        """Descuenta stock y crea la boleta con todas las líneas. Todo o nada.
-        Devuelve el tipo registrado ('VENTA' o 'FIADO')."""
+        """Descuenta stock y crea la boleta con todas las líneas, guardando en cada una el costo
+        promedio vigente del producto (para el margen). Todo o nada. Devuelve el id de la boleta."""
         if carrito.vacio:
             raise ErrorOperacion("Carrito vacío.")
         if fiado and cliente == CLIENTE_GENERAL:
@@ -53,14 +52,18 @@ class ServicioOperaciones:
             raise ErrorOperacion(f"El cliente '{cliente}' no existe.")
         tipo = "FIADO" if fiado else "VENTA"
         with self.db.transaccion():
-            lineas = self._lineas_con_stock(carrito, "restar")
+            lineas = []
+            for linea, p in self._productos_del_carrito(carrito):
+                nuevo_stock = self.db.productos.ajustar_stock(p.nombre, linea.cantidad, "restar")
+                lineas.append((p.id, linea.cantidad, linea.precio_unit, linea.subtotal, nuevo_stock, p.precio_compra))
             encargada_id = self.db.contactos.id_encargada(encargada, crear=True)
             boleta_id = self.db.boletas.crear(fecha, tipo, encargada_id, lineas, cliente_id=cliente_id, hora=hora_actual())
         log.info("%s #%s registrada: %d líneas, cliente %s, encargada %s", tipo, boleta_id, len(lineas), cliente, encargada)
-        return tipo
+        return boleta_id
 
     def registrar_compra(self, carrito, fecha, encargada, proveedor):
-        """Suma stock, crea la boleta ENTRADA y actualiza el costo de compra. Todo o nada."""
+        """Suma stock, crea la boleta ENTRADA, recalcula el costo promedio ponderado de cada
+        producto y anota el costo pagado en el historial de precios. Todo o nada."""
         if carrito.vacio:
             raise ErrorOperacion("La lista de ingreso está vacía.")
         if not proveedor:
@@ -69,9 +72,14 @@ class ServicioOperaciones:
         if proveedor_id is None:
             raise ErrorOperacion(f"El proveedor '{proveedor}' no existe.")
         with self.db.transaccion():
-            lineas = self._lineas_con_stock(carrito, "sumar")
-            for linea in carrito:
-                self.db.productos.actualizar_precio_compra(linea.producto, linea.precio_unit)
+            lineas = []
+            for linea, p in self._productos_del_carrito(carrito):
+                p = self.db.productos.obtener(p.nombre)  # relectura: el mismo producto puede repetirse en el carrito
+                promedio = costo_promedio(p.stock, p.precio_compra, linea.cantidad, linea.precio_unit)
+                nuevo_stock = self.db.productos.ajustar_stock(p.nombre, linea.cantidad, "sumar")
+                self.db.productos.actualizar_precio_compra(p.nombre, promedio)
+                self.db.precios.registrar(p.id, "compra", linea.precio_unit, fecha=str(fecha))
+                lineas.append((p.id, linea.cantidad, linea.precio_unit, linea.subtotal, nuevo_stock, linea.precio_unit))
             encargada_id = self.db.contactos.id_encargada(encargada, crear=True)
             boleta_id = self.db.boletas.crear(fecha, "ENTRADA", encargada_id, lineas, proveedor_id=proveedor_id, hora=hora_actual())
         log.info("ENTRADA #%s registrada: %d líneas, proveedor %s, encargada %s", boleta_id, len(lineas), proveedor, encargada)

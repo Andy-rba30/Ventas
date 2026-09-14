@@ -88,12 +88,13 @@ class RepositorioReportes:
         return round(float(row[0]), 2)
 
     def costo_vendido(self, f):
-        """Cantidad vendida (VENTA y FIADO) x precio_compra actual del producto."""
+        """Cantidad vendida (VENTA y FIADO) x costo unitario guardado en la línea al vender
+        (costo promedio de ese momento); las líneas anteriores a v3 usan el precio_compra actual."""
         if not f.incluye_boletas() or f.tipo == "ENTRADA":
             return 0.0
         where, params = self._where_boletas(f)
         row = self.cx.cursor.execute(f"""
-            SELECT COALESCE(SUM(l.cantidad * p.precio_compra), 0)
+            SELECT COALESCE(SUM(l.cantidad * COALESCE(l.costo_unit, p.precio_compra)), 0)
             FROM boleta_lineas l JOIN productos p ON p.id = l.producto_id
             JOIN boletas b ON b.id = l.boleta_id
             LEFT JOIN clientes c ON c.id = b.cliente_id
@@ -140,7 +141,7 @@ class RepositorioReportes:
             por_id = {b.id: b for b in boletas}
             marcas = ",".join("?" * len(por_id))
             for r in self.cx.cursor.execute(f"""
-                SELECT l.id, l.boleta_id, l.producto_id, p.nombre, l.cantidad, l.precio_unit, l.subtotal, l.stock_resultante
+                SELECT l.id, l.boleta_id, l.producto_id, p.nombre, l.cantidad, l.precio_unit, l.subtotal, l.stock_resultante, l.costo_unit
                 FROM boleta_lineas l JOIN productos p ON p.id = l.producto_id
                 WHERE l.boleta_id IN ({marcas}) ORDER BY l.id
             """, list(por_id)):
