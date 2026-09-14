@@ -86,14 +86,14 @@ pyinstaller agro.spec --noconfirm      # -> dist/AgroNegocio/
 ```
 
 Para publicar: sube la versión en `agro/__init__.py`, anota los cambios en
-[CHANGELOG.md](CHANGELOG.md) y crea el tag:
+[CHANGELOG.md](CHANGELOG.md) y lanza el workflow `Release Windows` de una de estas dos formas:
 
-```bash
-git tag v4.2.0 && git push origin v4.2.0
-```
+- Desde GitHub, sin comandos: pestaña **Actions** > **Release Windows** > **Run workflow**.
+- Con un tag: `git tag v4.2.0 && git push origin v4.2.0`.
 
-El workflow `Release Windows` construye el ejecutable en Windows, comprueba que arranca y
-adjunta el zip al Release de GitHub.
+El workflow construye el ejecutable en Windows, comprueba que arranca, crea el tag `vX.Y.Z` si
+no existe y adjunta `AgroNegocio-vX.Y.Z-windows.zip` al Release. Ese es el enlace que se
+comparte con quienes van a usar el programa.
 
 Consulta [PLAN_MEJORA.md](PLAN_MEJORA.md) para el plan de refactorización y
 mejora de la interfaz, y [CHANGELOG.md](CHANGELOG.md) para el historial de cambios.

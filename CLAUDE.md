@@ -21,7 +21,8 @@ En Linux hace falta `python3-tk`.
 Ejecutable de Windows: `pip install pyinstaller && pyinstaller agro.spec --noconfirm` produce
 `dist/AgroNegocio/` (onedir, sin consola, icono de `assets/`). El workflow
 `.github/workflows/build.yml` lo construye en `windows-latest` al crear un tag `vX.Y.Z` (debe
-coincidir con `agro.__version__`), hace un arranque de humo del .exe y adjunta el zip al Release.
+coincidir con `agro.__version__`) o a mano con "Run workflow" (crea el tag de la versión si no
+existe), hace un arranque de humo del .exe y adjunta el zip al Release.
 Versión única en `agro/__init__.py`; cambios en `CHANGELOG.md`.
 
 Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 y 3.12):
@@ -147,7 +148,7 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 ## Hoja de ruta
 Ver `PLAN_MEJORA.md`. Estado: todas las fases (0 a 6) completas. `tests/test_arranque.py` vigila
 que pandas, matplotlib, reportlab y openpyxl no se carguen al arrancar. Para publicar una versión:
-subir `agro.__version__`, anotar `CHANGELOG.md`, commit y `git tag vX.Y.Z && git push origin vX.Y.Z`.
+subir `agro.__version__`, anotar `CHANGELOG.md`, commit y lanzar `Release Windows` (Run workflow o tag).
 
 Rendimiento (BD de 20 000 líneas de `scripts/generar_datos_prueba.py`): importar `agro.ui.app`
 665 ms -> 152 ms; `ServicioReportes.generar` de un mes 545 ms -> 24 ms; `resumen_inicio` 31 -> 4 ms.
