@@ -96,14 +96,6 @@ def test_filtro_por_cliente_y_proveedor(con_movimientos, ops, reportes):
     assert reportes.generar(2026, 9, cliente="NADIE").vacio
 
 
-def test_exportar_excel_tres_hojas(con_movimientos, reportes, tmp_path):
-    import pandas as pd
-    ruta = tmp_path / "salida.xlsx"
-    assert reportes.exportar_excel(str(ruta)) and ruta.exists()
-    hojas = pd.read_excel(ruta, sheet_name=None)
-    assert set(hojas) == {"Boletas", "Lineas", "Pagos"} and len(hojas["Boletas"]) == 4 and len(hojas["Lineas"]) == 5
-
-
 def test_exportar_excel_sin_datos_devuelve_false(reportes, tmp_path):
     ruta = tmp_path / "vacio.xlsx"
     assert reportes.exportar_excel(str(ruta)) is False and not ruta.exists()
@@ -112,3 +104,77 @@ def test_exportar_excel_sin_datos_devuelve_false(reportes, tmp_path):
 def test_reporte_es_dataclass_con_balance():
     rep = Reporte(ingresos=10, gastos=4)
     assert rep.balance == 6 and rep.vacio
+
+
+# --- filtro por tipo, margen bruto, exportación filtrada y resumen de inicio -----------
+
+def test_filtro_por_tipo(con_movimientos, ops, reportes):
+    ops.cobrar_fiado(con_movimientos.boletas.deudas_pendientes()[0].id, "Rosa", monto=20, fecha="2026-09-20")
+    assert [b.tipo for b in reportes.generar(2026, 9, tipo="ENTRADA").boletas] == ["ENTRADA"]
+    assert [b.tipo for b in reportes.generar(2026, 9, tipo="VENTA").boletas] == ["VENTA"]
+    cobros = reportes.generar(2026, 9, tipo="COBRO_DEUDA")
+    assert [b.tipo for b in cobros.boletas] == ["COBRO_DEUDA"] and cobros.ingresos == 20 and cobros.gastos == 0
+    assert reportes.generar(2026, 9, tipo="FIADO", proveedor="AGROSUR").vacio
+
+
+def test_margen_bruto_usa_costo_actual_del_producto(con_movimientos, reportes):
+    rep = reportes.generar(2026, 9)
+    # vendido: UREA 2 + FOSFATO 1 (contado) + UREA 1 (fiado) = 240 + 90 + 120 = 450
+    # costo: la compra del día 4 dejó precio_compra de UREA en 95; FOSFATO sigue en 70 -> 3*95 + 1*70 = 355
+    assert rep.ventas == 450 and rep.costo_vendido == 355 and rep.margen_bruto == 95
+    assert reportes.generar(2026, 9, tipo="ENTRADA").margen_bruto == 0
+
+
+def test_movimientos_traen_unidad_y_stock_actual(con_movimientos, reportes):
+    mov = {m.producto: m for m in reportes.generar(2026, 9).movimientos}
+    assert mov["UREA"].unidad == "unid" and mov["UREA"].stock_actual == con_movimientos.productos.obtener("UREA").stock == 26
+    assert mov["FOSFATO"].stock_actual == 4
+
+
+def test_exportar_excel_filtrado_dos_hojas(con_movimientos, ops, reportes, tmp_path):
+    import pandas as pd
+    ops.cobrar_fiado(con_movimientos.boletas.deudas_pendientes()[0].id, "Rosa", monto=20, fecha="2026-09-20")
+    ruta = tmp_path / "sep.xlsx"
+    assert reportes.exportar_excel(str(ruta), 2026, 9)
+    hojas = pd.read_excel(ruta, sheet_name=None)
+    assert list(hojas) == ["Boletas", "Lineas"]
+    assert hojas["Boletas"]["Tipo"].tolist() == ["COBRO_DEUDA", "FIADO", "ENTRADA", "VENTA"]   # más reciente primero
+    assert len(hojas["Lineas"]) == 5 and set(hojas["Lineas"].columns) >= {"Producto", "Cantidad", "Subtotal (S/.)", "Ref boleta"}
+    # solo agosto
+    assert reportes.exportar_excel(str(tmp_path / "ago.xlsx"), 2026, 8)
+    assert pd.read_excel(tmp_path / "ago.xlsx", sheet_name="Boletas")["Tipo"].tolist() == ["VENTA"]
+    # filtro sin resultados
+    assert reportes.exportar_excel(str(tmp_path / "nada.xlsx"), 2025, 1) is False and not (tmp_path / "nada.xlsx").exists()
+    # sin periodo: todo (agosto + septiembre)
+    assert reportes.exportar_excel(str(tmp_path / "todo.xlsx"))
+    assert len(pd.read_excel(tmp_path / "todo.xlsx", sheet_name="Boletas")) == 5
+
+
+def test_cabeceras_en_negrita_y_anchos(con_movimientos, reportes, tmp_path):
+    from openpyxl import load_workbook
+    ruta = tmp_path / "f.xlsx"
+    reportes.exportar_excel(str(ruta), 2026, 9)
+    ws = load_workbook(ruta)["Boletas"]
+    assert ws["A1"].font.bold and ws.column_dimensions["D"].width >= len("Cliente/Proveedor")
+
+
+def test_resumen_inicio(con_datos, ops, reportes):
+    import datetime
+    from agro.servicios.formato import hoy
+    ops.registrar_venta(carrito(("UREA", 120, 2)), hoy(), "Administradora", "PÚBLICO GENERAL")
+    ops.registrar_venta(carrito(("FOSFATO", 90, 1)), hoy(), "Administradora", "JUAN", fiado=True)
+    ops.registrar_venta(carrito(("UREA", 120, 1)), "2026-01-10", "Administradora", "JUAN", fiado=True)  # fiado viejo
+    ops.registrar_compra(carrito(("UREA", 95, 1)), hoy(), "Administradora", "AGROSUR")                # no cuenta como venta
+    con_datos.productos.modificar("FOSFATO", "FOSFATO", 90, 70, 4, stock_minimo=5)
+    r = reportes.resumen_inicio()
+    assert (r.ventas_hoy, r.boletas_hoy) == (330, 2)
+    assert r.por_cobrar_total == 210
+    assert [p.nombre for p in r.bajo_minimo] == ["FOSFATO"]
+    assert [(d.cliente, d.deuda) for d in r.fiados_antiguos] == [("JUAN", 210)]
+    # con una fecha de referencia cercana al fiado viejo no hay fiados antiguos
+    assert reportes.resumen_inicio(hoy=datetime.date(2026, 1, 20)).fiados_antiguos == []
+
+
+def test_resumen_inicio_vacio(db, reportes):
+    r = reportes.resumen_inicio()
+    assert (r.ventas_hoy, r.boletas_hoy, r.por_cobrar_total, r.bajo_minimo, r.fiados_antiguos) == (0, 0, 0, [], [])

@@ -208,8 +208,26 @@ def t_compra_ui():
     app.mostrar_pantalla("ventas"); app.update()
 
 def t_borrar_operacion_ui():
-    reportes.generar(); app.update()
-    assert "17" in reportes.card_stock_total.cget("text")
+    app.mostrar_pantalla("reportes"); app.update()
+    assert reportes.lbl_periodo.cget("text").split()[-1].isdigit() and reportes.f_filtros.winfo_manager() == ""  # filtros plegados
+    # tarjetas: margen = vendido - costo actual; por cobrar total con subtexto del periodo
+    assert reportes.card_margen.cget("text").startswith("MARGEN BRUTO") and "de este periodo" in reportes.card_por_cobrar.cget("text")
+    mov = {reportes.tabla_resumen.valores(i)["producto"]: reportes.tabla_resumen.valores(i) for i in reportes.tabla_resumen.iids()}
+    assert float(mov["UREA"]["stock"]) == 17 and mov["UREA"]["unidad"] == "saco"
+    # filtros colapsables: al abrirlos y filtrar por tipo la consulta se ejecuta sola
+    reportes.alternar_filtros(); app.update(); assert reportes.f_filtros.winfo_manager() == "pack" and reportes.btn_filtros.cget("text") == "Filtros ▴"
+    reportes.combo_tipo.set("ENTRADA"); reportes.generar(); app.update()
+    assert [reportes.tabla_mensual.valores(i)["tipo"] for i in reportes.tabla_mensual.iids()] == ["ENTRADA"] and "tipo" in reportes.lbl_filtros_activos.cget("text")
+    reportes.limpiar_filtros(); app.update(); assert reportes.lbl_filtros_activos.cget("text") == ""
+    reportes.alternar_filtros(); app.update()
+    # navegación de periodo: mes anterior vacío y vuelta a hoy
+    reportes.cambiar_mes(-1); app.update(); assert "Sin movimientos" in reportes.lbl_movimientos.cget("text")
+    reportes.ir_a_hoy(); app.update(); assert reportes.lbl_movimientos.cget("text").startswith("5 movimiento")  # venta, fiado, 2 pagos, compra
+    # exportar el periodo filtrado a dos hojas
+    import pandas as pd
+    ruta = os.path.join(workdir, "export.xlsx")
+    assert app.reportes.exportar_excel(ruta, reportes.anio, reportes.mes, **reportes.filtros())
+    assert list(pd.read_excel(ruta, sheet_name=None)) == ["Boletas", "Lineas"]
     def fila_tipo(tipo):
         for iid in reportes.tabla_mensual.iids():
             if str(reportes.tabla_mensual.valores(iid)["tipo"]).startswith(tipo): return iid
@@ -339,6 +357,16 @@ def t_navegacion_atajos_y_ajustes():
     app.mostrar_pantalla("inicio"); app.update()
     ini = app.pantallas["inicio"]
     assert ini.card_por_cobrar.cget("text").endswith(f"S/. {db.boletas.total_por_cobrar():.2f}")
+    assert ini.card_ventas_hoy.cget("text").startswith("VENTAS DE HOY") and "boleta" in ini.card_ventas_hoy.cget("text")
+    assert ini.encabezado.lbl_subtitulo.cget("text") == "Encargada: Administradora"
+    # producto bajo mínimo aparece en 'por reponer'; fiado viejo aparece en la lista de antiguos
+    db.productos.modificar("UREA", "UREA", 120, 110, 2, stock_minimo=5)
+    db.contactos.agregar("cliente", "LUIS", "", "")
+    app.operaciones.registrar_venta(carrito_de(("UREA", 120, 1)), "2026-01-05", "Administradora", "LUIS", fiado=True)
+    ini.refrescar(); app.update()
+    assert [ini.tabla_reponer.valores(i)["producto"] for i in ini.tabla_reponer.iids()] == ["UREA"] and ini.card_bajo_minimo.cget("text").endswith("1")
+    assert [ini.tabla_fiados_antiguos.valores(i)["cliente"] for i in ini.tabla_fiados_antiguos.iids()] == ["LUIS"]
+    b = db.boletas.deudas_pendientes("LUIS")[0]; app.operaciones.eliminar_operaciones([f"B:{b.id}"]); app.refrescar_fiados(); app.refrescar_productos()
     assert app.wm_minsize() == (1024, 680)  # CTk sobreescribe minsize() solo como setter
     app.mostrar_pantalla("ventas")
 

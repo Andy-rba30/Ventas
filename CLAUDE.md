@@ -61,7 +61,13 @@ agro/ui/pantallas/         una pantalla por archivo (inicio, fiados, inventario,
                            Fiados: deudores (db.boletas.resumen_deudores) a la izquierda; a la
                            derecha boletas con saldo, dialogos.DialogoPago (parcial o total) e
                            historial (pagos_de_cliente). seleccionar_cliente(nombre) lo usa
-                           Contactos > Ver fiados
+                           Contactos > Ver fiados.
+                           Reportes: selector ◀ mes ▶ + Hoy, panel de filtros plegable (día,
+                           cliente, proveedor, tipo; cada cambio consulta), pestañas Resumen
+                           (tarjetas, barra caja, movimiento por producto) y Movimientos
+                           (Tabla arbol con claves B:/L:/P:, exportar filtrado, eliminar).
+                           Inicio: ServicioReportes.resumen_inicio (ventas de hoy, por cobrar,
+                           bajo mínimo, fiados > 30 días) y accesos rápidos
 ```
 Protocolo opcional de una pantalla (la app llama lo que exista): `al_mostrar()`,
 `refrescar_productos()`, `refrescar_contactos(clientes, proveedores)`, `refrescar_fiados()`,
@@ -100,10 +106,11 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 a 4.5 hechos (tokens, componentes,
-sidebar, Ajustes, Inicio básico, atajos, Ventas/Compras unificadas, Inventario y Contactos en
-maestro-detalle, esquema v2, Fiados por cliente con pagos parciales). Siguiente: Prompt 4.6
-(Reportes en dos niveles e Inicio completo).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas (rediseño de interfaz terminado: tokens,
+componentes, sidebar, Ajustes, atajos, Ventas/Compras unificadas, Inventario y Contactos en
+maestro-detalle, esquema v2, Fiados por cliente con pagos parciales, Reportes en dos pestañas,
+Inicio completo; matplotlib ya no se usa). Siguiente: Prompt 5.1 (reportes en SQL y arranque sin
+pandas).
 
 Nota para pruebas de UI headless: una ventana `withdraw()` no recibe teclas sintéticas
 (`event_generate` de F-keys, Supr, KeyRelease); para probar atajos hay que `deiconify()` +

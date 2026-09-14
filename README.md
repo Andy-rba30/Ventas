@@ -48,8 +48,8 @@ y Supr quita la línea seleccionada del carrito.
 | Contactos   | Maestro-detalle: tabla a la izquierda, ficha editable a la derecha (documento, teléfono, notas), deuda pendiente y acceso a sus fiados |
 | Fiados      | Deudores con días de antigüedad; por cliente, sus boletas con saldo, pagos parciales o totales con fecha, encargada y nota, e historial de pagos |
 | Inventario  | Maestro-detalle: tabla con unidad, stock, mínimo, precios y margen; ficha editable; desactivar/reactivar; ver inactivos |
-| Reportes    | Filtro por mes/día/cliente/proveedor, tarjetas resumen, gráfico y exportación a Excel |
-| Inicio      | Deuda total, productos bajo mínimo y accesos a Nueva venta / Ingreso de mercadería |
+| Reportes    | Selector de mes con filtros plegables (día, cliente, proveedor, tipo); pestaña Resumen (caja, compras, margen bruto, por cobrar, movimiento por producto) y pestaña Movimientos (boletas con líneas, exportar Excel, eliminar) |
+| Inicio      | Ventas de hoy, fiados pendientes, productos bajo mínimo, listas de reposición y fiados con más de 30 días, accesos a Nueva venta / Ingreso de mercadería |
 | Ajustes     | Encargadas, respaldo y restauración, apariencia (claro/oscuro/sistema) y versión |
 
 ## Migración de datos (v4.1 → v4.2)

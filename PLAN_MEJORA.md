@@ -96,8 +96,17 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅.
-> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.6). El 4.5 dejó Fiados con la
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅ · 4.6 ✅.
+> **Fases 0 a 4 completas.** Siguiente: 5.1. El 4.6 dejó Reportes con selector de mes,
+> botón Hoy y filtros plegables (día, cliente, proveedor, tipo) que consultan al cambiar;
+> pestaña Resumen (ingresos, compras, margen bruto = vendido − cantidad × precio_compra
+> actual, por cobrar total con subtexto del periodo, barra caja y movimiento por producto
+> con stock actual) y pestaña Movimientos (boletas con líneas, exportar Excel filtrado a
+> hojas Boletas y Líneas con cabeceras en negrita, eliminar). Se eliminó el gráfico y la
+> dependencia matplotlib. Inicio completo: ventas de hoy, fiados pendientes, bajo mínimo,
+> listas de reposición y fiados > 30 días, accesos rápidos. Nota para 5.2: el margen usa el
+> precio_compra actual del producto; `costo_unit` por línea llega con ese prompt.
+> Pruebas: 149 pytest + 18 de UI. El 4.5 dejó Fiados con la
 > tabla de deudores (cliente, boletas, deuda, más antigua, días; en rojo pasados 30 días),
 > tarjeta de total por cobrar, panel del cliente con sus boletas con saldo (doble clic =
 > detalle), diálogo de pago con monto parcial, fecha, encargada y nota, e historial de

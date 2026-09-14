@@ -308,8 +308,9 @@ class RepositorioBoletas:
 
     def lineas_dataframe(self):
         return pd.read_sql_query("""
-            SELECT l.id, l.boleta_id, b.fecha, b.hora, b.tipo, p.nombre AS producto, l.cantidad, l.precio_unit,
-                   l.subtotal, l.stock_resultante, COALESCE(c.nombre, '') AS cliente, COALESCE(pr.nombre, '') AS proveedor,
+            SELECT l.id, l.boleta_id, b.fecha, b.hora, b.tipo, p.nombre AS producto, p.unidad, l.cantidad, l.precio_unit,
+                   l.subtotal, l.stock_resultante, p.precio_compra AS costo_unit_actual, p.stock AS stock_actual,
+                   COALESCE(c.nombre, '') AS cliente, COALESCE(pr.nombre, '') AS proveedor,
                    e.nombre AS encargada, b.estado
             FROM boleta_lineas l
             JOIN boletas b ON b.id = l.boleta_id

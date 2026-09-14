@@ -159,7 +159,7 @@ class Encabezado(ctk.CTkFrame):
         self.lbl_titulo = ctk.CTkLabel(textos, text=titulo, font=fuente("titulo"), text_color=COLOR[color] if color else None, anchor="w")
         self.lbl_titulo.pack(anchor="w")
         self.lbl_subtitulo = None
-        if subtitulo:
+        if subtitulo is not None:  # "" crea la etiqueta vacía para rellenarla después
             self.lbl_subtitulo = ctk.CTkLabel(textos, text=subtitulo, font=fuente("cuerpo"), text_color=COLOR["texto_suave"], anchor="w")
             self.lbl_subtitulo.pack(anchor="w")
         self.acciones = ctk.CTkFrame(self, fg_color="transparent")
