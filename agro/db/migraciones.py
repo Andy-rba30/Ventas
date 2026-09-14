@@ -23,29 +23,41 @@ _COLUMNAS_LEGACY = [
 
 
 def aplicar(cx):
-    """Lleva la BD a VERSION_ESQUEMA. Idempotente."""
+    """Lleva la BD a VERSION_ESQUEMA paso a paso. Idempotente."""
     version = cx.cursor.execute("PRAGMA user_version").fetchone()[0]
     if version >= VERSION_ESQUEMA:
         return
-    if version == 0:
-        if cx.tabla_existe("transacciones"):
-            _respaldar_antes_de_migrar(cx)
-            with cx.transaccion():
-                _migrar_v0_a_v1(cx)
-            log.info("Migración v0 -> v1 completada")
-        else:
-            with cx.transaccion():
-                crear_esquema(cx.cursor)
+    if version == 0 and not cx.tabla_existe("transacciones"):
+        # BD nueva (o vacía): se crea directamente en la última versión.
+        with cx.transaccion():
+            crear_esquema(cx.cursor)
         cx.cursor.execute(f"PRAGMA user_version={VERSION_ESQUEMA}")
+        return
+    _respaldar_antes_de_migrar(cx, version)
+    while version < VERSION_ESQUEMA:
+        paso = _PASOS[version]
+        with cx.transaccion():
+            paso(cx)
+        version += 1
+        cx.cursor.execute(f"PRAGMA user_version={version}")
+        log.info("Migración a esquema v%d completada", version)
 
 
-def _respaldar_antes_de_migrar(cx):
+def _migrar_v1_a_v2(cx):
+    """v2: columna `notas` en clientes y proveedores."""
+    for tabla in ("clientes", "proveedores"):
+        if "notas" not in cx.columnas_de(tabla):
+            cx.cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN notas TEXT NOT NULL DEFAULT ''")
+
+
+def _respaldar_antes_de_migrar(cx, version_origen):
     if cx.db_name == ":memory:":
         return None
     carpeta = os.path.join(os.path.dirname(os.path.abspath(cx.db_name)), "backups")
     os.makedirs(carpeta, exist_ok=True)
     marca = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    ruta = os.path.join(carpeta, f"negocio_pre_migracion_{marca}.db")
+    # La versión de origen va en el nombre: dos migraciones en el mismo segundo no se pisan.
+    ruta = os.path.join(carpeta, f"negocio_pre_migracion_v{version_origen}_{marca}.db")
     cx.respaldar_a(ruta)
     log.info("Copia previa a la migración: %s", ruta)
     return ruta
@@ -174,3 +186,7 @@ def _migrar_v0_a_v1(cx):
     cur.execute("ALTER TABLE transacciones RENAME TO _legacy_transacciones")
     log.info("Migración: %d boletas, %d líneas, %d cobros (%d sin vincular)",
              len(boletas), len(linea_legacy), len(cobros), sin_vincular)
+
+
+# Versión de origen -> función que la lleva a la siguiente.
+_PASOS = {0: _migrar_v0_a_v1, 1: _migrar_v1_a_v2}

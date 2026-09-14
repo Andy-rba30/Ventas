@@ -187,7 +187,7 @@ def t_compra_ui():
     p = db.productos.obtener("UREA")
     assert compras.carrito.vacio and p.stock == 17 and p.precio_compra == 110.0, p
     assert toasts[n:] and "AGROSUR" in toasts[-1][1]
-    inv = app.pantallas["productos"].tabla_precios
+    inv = app.pantallas["productos"].tabla_productos
     assert any(inv.valores(i)["producto"] == "UREA" and float(inv.valores(i)["stock"]) == 17 for i in inv.iids())
     app.mostrar_pantalla("ventas"); app.update()
 
@@ -205,13 +205,87 @@ def t_borrar_operacion_ui():
     reportes.tabla_mensual.seleccionar_iid(fila_tipo("FIADO")); reportes.borrar_operacion(); app.update()
     assert db.boletas.deudas_pendientes() == [] and db.productos.obtener("UREA").stock == 18
 
+def carrito_de(*lineas):
+    from agro.servicios.carrito import Carrito
+    c = Carrito()
+    for prod, precio, cant in lineas: c.agregar(prod, precio, cant)
+    return c
+
 def t_navegacion_y_contactos():
     app.mostrar_pantalla("contactos"); app.update()
     cont = app.pantallas["contactos"]
-    assert any(cont.tabla_clientes.valores(i)["nombre"] == "JUAN" for i in cont.tabla_clientes.iids())
-    poner(cont.ent_prov_nom, "semillas sur"); cont.guardar("proveedor")
+    sec_cli, sec_prov = cont.secciones["cliente"], cont.secciones["proveedor"]
+    assert any(sec_cli.tabla.valores(i)["nombre"] == "JUAN" for i in sec_cli.tabla.iids())
+    # alta de proveedor por diálogo
+    dlg = cont.nuevo("proveedor"); app.update()
+    dlg.formulario.nombre.set("semillas sur"); dlg.formulario.documento.set("Luis"); dlg.formulario.notas.insert("1.0", "entrega los lunes")
+    assert dlg.guardar() is True; app.update()
+    assert db.contactos.obtener("proveedor", "SEMILLAS SUR").notas == "entrega los lunes"
     assert "SEMILLAS SUR" in compras.combo_persona.cget("values") and "SEMILLAS SUR" in reportes.combo_prov.cget("values")
     assert compras.combo_persona.get() == "AGROSUR"  # el proveedor elegido se conserva al refrescar
+    assert sec_prov.seleccionado == "SEMILLAS SUR" and sec_prov.lbl_titulo.cget("text") == "SEMILLAS SUR"
+    # nombre duplicado: el diálogo no se cierra
+    dlg2 = cont.nuevo("cliente"); dlg2.formulario.nombre.set("juan"); n = len(avisos)
+    assert dlg2.guardar() is False and avisos[n:] and dlg2.winfo_exists(); dlg2.destroy(); app.update()
+    # detalle del cliente: deuda, notas y Ver fiados con filtro
+    db.contactos.agregar("cliente", "ANA", "", "")
+    app.operaciones.registrar_venta(carrito_de(("UREA", 120, 2)), "2026-09-08", "Administradora", "ANA", fiado=True)
+    app.refrescar_contactos(); app.refrescar_fiados(); app.update()
+    sec_cli.tabla.seleccionar_por_valor("nombre", "ANA"); app.update()
+    assert sec_cli.seleccionado == "ANA" and sec_cli.lbl_deuda.cget("text") == "Deuda pendiente: S/. 240.00"
+    sec_cli.formulario.telefono.set("555"); sec_cli.formulario.notas.insert("1.0", "vecina"); assert sec_cli.guardar_cambios() is True
+    c = db.contactos.obtener("cliente", "ANA"); assert (c.telefono, c.notas) == ("555", "vecina")
+    sec_cli.ver_fiados(); app.update()
+    assert app.pantalla_actual == "fiados" and fiados.filtro_cliente == "ANA"
+    assert [fiados.tabla_fiados.valores(i)["cliente"] for i in fiados.tabla_fiados.iids()] == ["ANA"]
+    fiados.filtrar_cliente(None); assert fiados.filtro_cliente is None
+    # PÚBLICO GENERAL no se puede eliminar
+    app.mostrar_pantalla("contactos"); sec_cli.tabla.seleccionar_por_valor("nombre", "PÚBLICO GENERAL"); app.update()
+    assert sec_cli.btn_eliminar.cget("state") == "disabled"
+    # limpiar el fiado de ANA para no alterar los casos siguientes
+    b = db.boletas.deudas_pendientes("ANA")[0]; app.operaciones.eliminar_operaciones([f"B:{b.id}"]); app.refrescar_fiados(); app.refrescar_productos()
+    app.mostrar_pantalla("ventas")
+
+def t_inventario_maestro_detalle():
+    app.mostrar_pantalla("productos"); app.update()
+    inv = app.pantallas["productos"]
+    assert inv.seleccionado is None and not inv.panel.winfo_ismapped()
+    fila = inv.tabla_productos.valores(inv.tabla_productos.iids()[0])
+    assert fila["producto"] == "UREA" and fila["unidad"] == "saco" and fila["margen"] == "8 %"  # (120-110)/120
+    # alta por diálogo con validación
+    dlg = inv.nuevo_producto(); app.update()
+    dlg.formulario.nombre.set("guano"); dlg.formulario.precio_venta.set("0"); dlg.formulario.stock.set("100")
+    n = len(avisos); assert dlg.guardar() is False and dlg.winfo_exists()  # precio 0 no pasa
+    dlg.formulario.precio_venta.set("25"); dlg.formulario.precio_compra.set("15"); dlg.formulario.unidad.set("kg"); dlg.formulario.stock_minimo.set("20")
+    assert dlg.guardar() is True; app.update()
+    g = db.productos.obtener("GUANO"); assert (g.unidad, g.precio_venta, g.precio_compra, g.stock, g.stock_minimo) == ("kg", 25, 15, 100, 20)
+    assert inv.seleccionado == "GUANO" and inv.lbl_titulo_panel.cget("text") == "GUANO"
+    # edición desde el panel
+    inv.formulario.stock.set("15"); inv.formulario.nombre.set("guano de isla")
+    assert inv.guardar_cambios() is True; app.update()
+    g = db.productos.obtener("GUANO DE ISLA"); assert g.stock == 15 and g.bajo_stock and db.productos.obtener("GUANO") is None
+    assert "bajo el stock mínimo" in inv.lbl_estado.cget("text")
+    # renombrar a un nombre existente falla sin cambios
+    inv.formulario.nombre.set("UREA"); n = len(avisos); assert inv.guardar_cambios() is False and avisos[n:]
+    # desactivar, mostrar inactivos, reactivar
+    inv.alternar_activo(); app.update()
+    # desaparece de la tabla (inactivos ocultos) pero el panel lo conserva para poder deshacer
+    assert db.productos.obtener("GUANO DE ISLA") is None
+    assert "GUANO DE ISLA" not in [inv.tabla_productos.valores(i)["producto"] for i in inv.tabla_productos.iids()]
+    assert inv.seleccionado == "GUANO DE ISLA" and inv.btn_estado.cget("text") == "Reactivar producto"
+    inv.mostrar_inactivos.set(True); inv.refrescar_productos(); app.update()
+    iid = [i for i in inv.tabla_productos.iids() if inv.tabla_productos.valores(i)["producto"] == "GUANO DE ISLA"][0]
+    assert "inactiva" in inv.tabla_productos.tree.item(iid)["tags"]
+    inv.tabla_productos.seleccionar_iid(iid); app.update()
+    assert inv.btn_estado.cget("text") == "Reactivar producto"
+    inv.alternar_activo(); app.update()
+    assert db.productos.obtener("GUANO DE ISLA").activo and inv.btn_estado.cget("text") == "Desactivar producto"
+    inv.mostrar_inactivos.set(False); inv.refrescar_productos()
+    # buscador filtra
+    poner(inv.ent_buscar, "ure"); inv.refrescar_productos(); app.update()
+    assert [inv.tabla_productos.valores(i)["producto"] for i in inv.tabla_productos.iids()] == ["UREA"]
+    poner(inv.ent_buscar, ""); inv.refrescar_productos()
+    db.productos.desactivar("GUANO DE ISLA"); app.refrescar_productos()
     app.mostrar_pantalla("ventas")
 
 def t_navegacion_atajos_y_ajustes():
@@ -267,7 +341,8 @@ for nombre, fn in [
     ("cobrar deuda desde la UI con encargada actual", t_cobrar_deuda_ui),
     ("ingreso de mercadería con precio editable en el diálogo", t_compra_ui),
     ("eliminar operaciones: bloqueo de fiado pagado y reapertura", t_borrar_operacion_ui),
-    ("navegación y refresco cruzado de contactos", t_navegacion_y_contactos),
+    ("contactos maestro-detalle: alta, duplicado, notas, deuda y Ver fiados", t_navegacion_y_contactos),
+    ("inventario maestro-detalle: alta, edición, desactivar, inactivos, filtro", t_inventario_maestro_detalle),
     ("sidebar activo, atajos F/Ctrl+B/Ctrl+Enter/Esc, Ajustes e Inicio", t_navegacion_atajos_y_ajustes),
 ]:
     caso(nombre, fn)

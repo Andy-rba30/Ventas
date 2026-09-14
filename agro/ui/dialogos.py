@@ -77,6 +77,41 @@ def elegir_opcion(parent, titulo, etiqueta, opciones, actual=None):
     return resultado["valor"]
 
 
+class DialogoFormulario(ctk.CTkToplevel):
+    """Ventana modal que aloja un formulario. construir(padre) -> widget con .leer() (lanza
+    ValueError si hay datos inválidos) y opcionalmente .enfocar(). al_guardar(datos) devuelve
+    True para cerrar; False mantiene el diálogo abierto (p. ej. nombre duplicado)."""
+
+    def __init__(self, parent, titulo, construir, al_guardar, texto_guardar="Guardar", tamano="380x460"):
+        super().__init__(parent)
+        self.al_guardar = al_guardar
+        self.title(titulo)
+        self.geometry(tamano)
+        self.resizable(False, False)
+        self.grab_set()
+        ctk.CTkLabel(self, text=titulo, font=fuente("subtitulo")).pack(pady=(ESPACIO["m"], ESPACIO["s"]), padx=ESPACIO["m"], anchor="w")
+        self.formulario = construir(self)
+        self.formulario.pack(fill="both", expand=True, padx=ESPACIO["m"])
+        botones = ctk.CTkFrame(self, fg_color="transparent")
+        botones.pack(pady=ESPACIO["m"])
+        boton_primario(botones, texto_guardar, self.guardar, width=140).pack(side="left", padx=ESPACIO["xs"])
+        boton_secundario(botones, "Cancelar", self.destroy, width=140).pack(side="left", padx=ESPACIO["xs"])
+        self.bind("<Return>", lambda e: self.guardar())
+        self.bind("<Escape>", lambda e: self.destroy())
+        if hasattr(self.formulario, "enfocar"):
+            self.after(50, self.formulario.enfocar)
+
+    def guardar(self):
+        try:
+            datos = self.formulario.leer()
+        except ValueError:
+            return False
+        if self.al_guardar(datos):
+            self.destroy()
+            return True
+        return False
+
+
 class DialogoCantidad(ctk.CTkToplevel):
     """Pide la cantidad (y el precio unitario, si es editable) para agregar un producto al carrito.
     No bloquea: al confirmar llama a al_confirmar(cantidad, precio) y se cierra."""

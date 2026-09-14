@@ -5,7 +5,7 @@ Versionado con PRAGMA user_version. La versión 0 es el esquema heredado (tabla
 """
 from agro.config import CLIENTE_GENERAL, ENCARGADA_DEFAULT, UMBRAL_BAJO_STOCK
 
-VERSION_ESQUEMA = 1
+VERSION_ESQUEMA = 2  # v2: notas en clientes y proveedores
 
 TABLAS = [
     f"""
@@ -25,7 +25,8 @@ TABLAS = [
         nombre TEXT NOT NULL UNIQUE,
         documento TEXT,
         telefono TEXT,
-        activo INTEGER NOT NULL DEFAULT 1
+        activo INTEGER NOT NULL DEFAULT 1,
+        notas TEXT NOT NULL DEFAULT ''
     )""",
     """
     CREATE TABLE IF NOT EXISTS proveedores (
@@ -33,7 +34,8 @@ TABLAS = [
         nombre TEXT NOT NULL UNIQUE,
         contacto TEXT,
         telefono TEXT,
-        activo INTEGER NOT NULL DEFAULT 1
+        activo INTEGER NOT NULL DEFAULT 1,
+        notas TEXT NOT NULL DEFAULT ''
     )""",
     """
     CREATE TABLE IF NOT EXISTS encargadas (

@@ -45,9 +45,9 @@ y Supr quita la línea seleccionada del carrito.
 |-------------|----------|
 | Ventas      | Buscar producto, doble clic o Enter para elegir cantidad (acepta 1/2), carrito editable, un solo botón Cobrar / Registrar fiado con el monto |
 | Compras     | Misma pantalla que Ventas en modo compra: cantidad y costo unitario por línea, actualiza stock y costo de referencia |
-| Contactos   | Alta y baja de clientes y proveedores |
+| Contactos   | Maestro-detalle: tabla a la izquierda, ficha editable a la derecha (documento, teléfono, notas), deuda pendiente y acceso a sus fiados |
 | Fiados      | Cuentas por cobrar, registro de pagos e historial por cliente |
-| Inventario  | Crear, editar y borrar productos; lista de precios y stock |
+| Inventario  | Maestro-detalle: tabla con unidad, stock, mínimo, precios y margen; ficha editable; desactivar/reactivar; ver inactivos |
 | Reportes    | Filtro por mes/día/cliente/proveedor, tarjetas resumen, gráfico y exportación a Excel |
 | Inicio      | Deuda total, productos bajo mínimo y accesos a Nueva venta / Ingreso de mercadería |
 | Ajustes     | Encargadas, respaldo y restauración, apariencia (claro/oscuro/sistema) y versión |
@@ -56,7 +56,7 @@ y Supr quita la línea seleccionada del carrito.
 
 Al abrir por primera vez una base de datos de la versión anterior, el programa la
 migra solo al nuevo esquema (boletas con líneas y pagos). Antes guarda una copia en
-`backups/negocio_pre_migracion_<fecha>.db` junto a la base, y conserva la tabla
+`backups/negocio_pre_migracion_v<versión>_<fecha>.db` junto a la base, y conserva la tabla
 antigua como `_legacy_transacciones`. Los detalles quedan en `app.log`.
 
 Consulta [PLAN_MEJORA.md](PLAN_MEJORA.md) para el plan de refactorización y

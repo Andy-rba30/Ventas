@@ -28,15 +28,16 @@ agro/registro.py           logger 'agro' -> app.log
 agro/preferencias.py       config.json junto a la BD: apariencia, geometría, último respaldo
 agro/db/                   SQLite. BaseDatos = Conexion + repositorios
    conexion.py             PRAGMAs, transaccion(), respaldo, introspección; llama a migraciones
-   esquema.py              DDL v1 (productos, clientes, proveedores, encargadas, boletas,
-                           boleta_lineas, pagos) + índices. VERSION_ESQUEMA en PRAGMA user_version
-   migraciones.py          v0 (tabla plana transacciones) -> v1, con copia previa en backups/
-                           y la tabla vieja conservada como _legacy_transacciones
+   esquema.py              DDL actual (productos, clientes, proveedores, encargadas, boletas,
+                           boleta_lineas, pagos) + índices. VERSION_ESQUEMA (=2) en PRAGMA user_version
+   migraciones.py          pasos encadenados _PASOS[version]: v0 (tabla plana) -> v1 (boletas),
+                           v1 -> v2 (notas en contactos). Copia previa en backups/ con la versión
+                           de origen en el nombre; la tabla vieja queda como _legacy_transacciones
    productos.py            db.productos.*  (dataclass Producto; no se borran: se desactivan)
    boletas.py              db.boletas.*    (Boleta, LineaBoleta, Pago; pagos parciales;
                            eliminar_boleta/linea/pago con reversión de stock)
-   contactos.py            db.contactos.*  (clientes, proveedores, encargadas; con historial
-                           se desactivan en vez de borrarse)
+   contactos.py            db.contactos.*  (dataclass Contacto con notas; obtener/modificar;
+                           clientes, proveedores y encargadas con historial se desactivan)
 agro/servicios/            lógica de negocio sin Tk
    formato.py              moneda(), cantidad(), parse_cantidad(), MESES
    carrito.py              Carrito / LineaCarrito
@@ -53,7 +54,10 @@ agro/ui/dialogos.py        calendario, alta rápida de contacto, elegir_opcion, 
 agro/ui/pantallas/         una pantalla por archivo (inicio, fiados, inventario, contactos,
                            reportes, ajustes). Ventas y Compras son la misma clase
                            movimiento.PantallaMovimiento(modo="venta"|"compra"); agregar al
-                           carrito pasa por dialogos.DialogoCantidad (no bloqueante, callback)
+                           carrito pasa por dialogos.DialogoCantidad (no bloqueante, callback).
+                           Inventario y Contactos son maestro-detalle: tabla 65 % + panel 35 %
+                           con un Formulario* (cargar/leer/enfocar); el alta reutiliza el mismo
+                           formulario dentro de dialogos.DialogoFormulario
 ```
 Protocolo opcional de una pantalla (la app llama lo que exista): `al_mostrar()`,
 `refrescar_productos()`, `refrescar_contactos(clientes, proveedores)`, `refrescar_fiados()`,
@@ -92,9 +96,9 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1, 4.2 y 4.3 hechos (tokens, componentes,
-sidebar, Ajustes, Inicio básico, atajos, Ventas/Compras unificadas). Siguiente: Prompt 4.4
-(Inventario y Contactos en maestro-detalle).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 a 4.4 hechos (tokens, componentes,
+sidebar, Ajustes, Inicio básico, atajos, Ventas/Compras unificadas, Inventario y Contactos en
+maestro-detalle, esquema v2). Siguiente: Prompt 4.5 (Fiados por cliente y pagos parciales).
 
 Nota para pruebas de UI headless: una ventana `withdraw()` no recibe teclas sintéticas
 (`event_generate` de F-keys, Supr, KeyRelease); para probar atajos hay que `deiconify()` +

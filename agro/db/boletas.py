@@ -132,12 +132,18 @@ class RepositorioBoletas:
         """(fecha, producto, cantidad, subtotal) de cada línea fiada con saldo del cliente."""
         return [(b.fecha, l.producto, l.cantidad, l.subtotal) for b in self.deudas_pendientes(cliente) for l in b.lineas]
 
-    def total_por_cobrar(self):
-        row = self.cx.cursor.execute("""
+    def total_por_cobrar(self, cliente=None):
+        """Saldo pendiente de todos los fiados, o solo de un cliente."""
+        sql = """
             SELECT COALESCE(SUM(b.total - COALESCE((SELECT SUM(monto) FROM pagos WHERE boleta_id=b.id), 0)), 0)
-            FROM boletas b WHERE b.tipo='FIADO' AND b.estado != 'PAGADO'
-        """).fetchone()
-        return round(float(row[0]), 2)
+            FROM boletas b LEFT JOIN clientes c ON c.id = b.cliente_id
+            WHERE b.tipo='FIADO' AND b.estado != 'PAGADO'
+        """
+        params = ()
+        if cliente:
+            sql += " AND c.nombre=?"
+            params = (cliente,)
+        return round(float(self.cx.cursor.execute(sql, params).fetchone()[0]), 2)
 
     # --- pagos --------------------------------------------------------------
     def registrar_pago(self, boleta_id, monto, encargada_id, fecha=None, hora=None, notas=""):

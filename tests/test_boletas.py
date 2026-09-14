@@ -128,7 +128,7 @@ def test_cliente_con_boletas_se_desactiva_en_vez_de_borrarse(con_datos, fiado):
     assert con_datos.boletas.obtener(fiado).cliente == "JUAN"  # el historial sigue mostrando el nombre
     # volver a agregarlo lo reactiva
     assert con_datos.contactos.agregar("cliente", "JUAN", "999", "111")
-    assert ("JUAN", "999", "111") in [r[1:] for r in con_datos.contactos.listar("cliente")]
+    assert ("JUAN", "999", "111") in [r[1:4] for r in con_datos.contactos.listar("cliente")]
 
 
 def test_cliente_sin_boletas_se_borra(con_datos):

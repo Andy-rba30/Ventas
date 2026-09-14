@@ -58,6 +58,7 @@ class Tabla(ctk.CTkFrame):
         # Etiquetas de fila con significado fijo en toda la app
         self.tree.tag_configure("alerta", foreground=COLOR["peligro_hover"], font=FUENTE_TABLA_NEGRITA)
         self.tree.tag_configure("resaltada", background=COLOR["resaltado_suave"], font=FUENTE_TABLA_NEGRITA)
+        self.tree.tag_configure("inactiva", foreground=COLOR["texto_suave"])
 
         if on_select:
             self.tree.bind("<<TreeviewSelect>>", lambda e: on_select(self.seleccion()))
@@ -273,6 +274,17 @@ def boton_secundario(parent, texto, command, **kw):
     kw.setdefault("border_color", COLOR["primario"])
     kw.setdefault("text_color", (COLOR["primario"], "#FFFFFF"))
     kw.setdefault("hover_color", COLOR["neutro"])
+    return ctk.CTkButton(parent, text=texto, command=command, **kw)
+
+
+def boton_enlace(parent, texto, command, color="peligro", **kw):
+    """Acción discreta con aspecto de enlace (p. ej. 'Desactivar producto')."""
+    kw.setdefault("fg_color", "transparent")
+    kw.setdefault("hover_color", COLOR.get(f"{color}_suave", COLOR["neutro"]))
+    kw.setdefault("text_color", COLOR[color])
+    kw.setdefault("font", fuente("pequeña"))
+    kw.setdefault("height", 26)
+    kw.setdefault("anchor", "w")
     return ctk.CTkButton(parent, text=texto, command=command, **kw)
 
 

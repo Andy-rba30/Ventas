@@ -96,8 +96,13 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅.
-> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.4). El 4.3 dejó una sola
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅.
+> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.5). El 4.4 dejó Inventario y
+> Contactos en maestro-detalle (tabla 65 % + panel 35 %, alta en diálogo con el mismo
+> formulario, desactivar/reactivar productos, "Mostrar inactivos", deuda por cliente y
+> "Ver fiados" que filtra la pantalla Fiados). Para el campo Notas de contactos se añadió
+> el esquema v2 (migración v1→v2 encadenada, copia previa con la versión en el nombre).
+> Pruebas: 139 pytest + 18 de UI. El 4.3 dejó una sola
 > `PantallaMovimiento(modo)` para Ventas y Compras: encabezado con fecha y
 > cliente/proveedor, buscador con Enter, diálogo de cantidad (precio editable solo en
 > compra), carrito 60/40 con tooltip, un solo botón con el monto (Cobrar / Registrar
