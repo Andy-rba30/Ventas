@@ -96,10 +96,15 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅.
-> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.2). Tras el 4.1 no queda
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅.
+> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.3). Tras el 4.1 no queda
 > ningún hex, `ttk.Treeview` ni `CTkFont` fuera de `agro/ui/tema.py` y
-> `agro/ui/componentes.py`; la disposición de las pantallas no cambió todavía. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub. Esquema v1
+> `agro/ui/componentes.py`. El 4.2 dejó el sidebar solo con navegación (Inicio,
+> Ventas, Compras, Fiados, Inventario, Contactos, Reportes, Ajustes), la pantalla
+> Ajustes, `config.json` (apariencia, geometría, último respaldo), minsize 1024x680
+> y atajos F1-F8, Ctrl+B y Esc. Iconos: se quitaron los emojis del menú (texto
+> corto). Inicio existe ya con tarjetas y accesos rápidos; el 4.6 la completa.
+> Pruebas: 130 pytest + 15 de UI. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub. Esquema v1
 > (boletas + líneas + pagos, productos/contactos por id, PRAGMA user_version) con
 > migración automática desde la tabla plana y copia previa en `backups/`.
 > Pruebas: `pytest` (123 casos en `tests/`) y `scripts/prueba_carrito.py` (UI con

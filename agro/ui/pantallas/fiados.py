@@ -44,6 +44,8 @@ class PantallaFiados(ctk.CTkFrame):
              "total": moneda(b.total), "pagado": moneda(b.pagado), "saldo": moneda(b.saldo)}
             for b in self.app.db.boletas.deudas_pendientes())
 
+    refrescar_fiados = refrescar
+
     def cobrar_deuda(self):
         fila = self.tabla_fiados.seleccion()
         if not fila: return

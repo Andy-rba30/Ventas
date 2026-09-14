@@ -50,6 +50,33 @@ def abrir_popup_contacto(parent, db, tipo, al_guardar):
     e_nom.focus_set()
 
 
+def elegir_opcion(parent, titulo, etiqueta, opciones, actual=None):
+    """Diálogo modal con un desplegable. Devuelve la opción elegida o None si se cancela."""
+    top = ctk.CTkToplevel(parent)
+    top.title(titulo)
+    top.geometry("320x180")
+    top.grab_set()
+    resultado = {"valor": None}
+    ctk.CTkLabel(top, text=etiqueta, font=fuente("cuerpo_negrita")).pack(pady=(ESPACIO["m"], ESPACIO["xs"]))
+    combo = ctk.CTkOptionMenu(top, values=list(opciones) or ["—"], width=240)
+    if actual in opciones:
+        combo.set(actual)
+    combo.pack(pady=ESPACIO["xs"])
+    botones = ctk.CTkFrame(top, fg_color="transparent")
+    botones.pack(pady=ESPACIO["m"])
+
+    def aceptar():
+        resultado["valor"] = combo.get() if opciones else None
+        top.destroy()
+
+    boton_primario(botones, "Aceptar", aceptar, width=110).pack(side="left", padx=ESPACIO["xs"])
+    boton_secundario(botones, "Cancelar", top.destroy, width=110).pack(side="left", padx=ESPACIO["xs"])
+    top.bind("<Return>", lambda e: aceptar())
+    top.bind("<Escape>", lambda e: top.destroy())
+    parent.wait_window(top)
+    return resultado["valor"]
+
+
 def abrir_historial_cliente(parent, cliente, filas):
     """Desglose de fiados pendientes. filas: (fecha, producto, cantidad, total)."""
     top = ctk.CTkToplevel(parent)

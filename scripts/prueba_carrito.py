@@ -28,6 +28,7 @@ from agro.ui.app import Aplicacion  # noqa: E402
 
 app = Aplicacion(os.path.join(workdir, "prueba.db"))
 # Tk solo calcula la geometría de las tablas (bbox) si la ventana se mostró al menos una vez.
+app.mostrar_pantalla("ventas")
 app.update(); app.deiconify(); app.update(); app.withdraw(); app.update()
 ventas = app.pantallas["ventas"]
 compras = app.pantallas["compras"]
@@ -134,7 +135,7 @@ def t_finalizar_venta_y_fiado():
 
 def t_cobrar_deuda_ui():
     fiados.tabla_fiados.tree.selection_set(fiados.tabla_fiados.tree.get_children()[0])
-    app.combo_encargada.set("Administradora")
+    app.set_encargada("Administradora")
     fiados.cobrar_deuda(); app.update()
     assert db.boletas.deudas_pendientes() == [] and fiados.tabla_fiados.tree.get_children() == ()
     cobro = db.cursor.execute("SELECT e.nombre, g.monto, g.boleta_id FROM pagos g JOIN encargadas e ON e.id=g.encargada_id").fetchone()
@@ -175,6 +176,40 @@ def t_navegacion_y_contactos():
     assert "SEMILLAS SUR" in compras.combo_proveedor.cget("values") and "SEMILLAS SUR" in reportes.combo_prov.cget("values")
     app.mostrar_pantalla("ventas")
 
+def t_navegacion_atajos_y_ajustes():
+    from agro.ui.tema import COLOR
+    # Los atajos de teclado solo llegan a una ventana mapeada y con foco.
+    app.deiconify(); app.focus_force(); app.update()
+    app.event_generate("<F4>"); app.update()
+    assert app.pantalla_actual == "fiados", app.pantalla_actual
+    assert app.botones_nav["fiados"].cget("fg_color") == COLOR["primario"] and app.botones_nav["ventas"].cget("fg_color") == "transparent"
+    app.event_generate("<F2>"); app.update(); assert app.pantalla_actual == "ventas"
+    app.event_generate("<Control-b>"); app.update()
+    assert str(app.focus_get()).startswith(str(ventas.ent_buscar)), app.focus_get()
+    ventas.producto_sel = db.productos.obtener("UREA"); ventas.lbl_sel_prod.configure(text="UREA")
+    app.event_generate("<Escape>"); app.update()
+    assert ventas.producto_sel is None and ventas.lbl_sel_prod.cget("text") == "---"
+    app.withdraw(); app.update()
+    # Ajustes: agregar y quitar encargada, apariencia persistida en config.json
+    app.mostrar_pantalla("ajustes"); app.update()
+    aj = app.pantallas["ajustes"]
+    aj.campo_encargada.set("rosa"); aj.agregar_encargada(); app.update()
+    assert "Rosa" in db.contactos.encargadas() and [aj.tabla_encargadas.valores(i)["nombre"] for i in aj.tabla_encargadas.iids()] == ["Administradora", "Rosa"]
+    app.set_encargada("Rosa"); aj.tabla_encargadas.seleccionar_por_valor("nombre", "Rosa"); aj.quitar_encargada(); app.update()
+    assert "Rosa" not in db.contactos.encargadas() and app.encargada_actual() == "Administradora"
+    assert "Encargada: Administradora" == app.lbl_encargada.cget("text")
+    aj._cambiar_apariencia("Oscuro"); app.update()
+    from agro.preferencias import Preferencias
+    assert Preferencias(db.db_name).get("apariencia") == "Dark"
+    aj._cambiar_apariencia("Claro")
+    assert "Versión" in aj.lbl_acerca.cget("text") and "todavía" in aj.lbl_ultimo_respaldo.cget("text")
+    # Inicio refleja la deuda total y el stock bajo mínimo
+    app.mostrar_pantalla("inicio"); app.update()
+    ini = app.pantallas["inicio"]
+    assert ini.card_por_cobrar.cget("text").endswith(f"S/. {db.boletas.total_por_cobrar():.2f}")
+    assert app.wm_minsize() == (1024, 680)  # CTk sobreescribe minsize() solo como setter
+    app.mostrar_pantalla("ventas")
+
 print("== interfaz ==")
 for nombre, fn in [
     ("doble agregado del mismo producto", t_doble_agregado),
@@ -191,6 +226,7 @@ for nombre, fn in [
     ("ingreso de mercadería actualiza stock, costo e inventario", t_compra_ui),
     ("eliminar operaciones: bloqueo de fiado pagado y reapertura", t_borrar_operacion_ui),
     ("navegación y refresco cruzado de contactos", t_navegacion_y_contactos),
+    ("sidebar activo, atajos F/Ctrl+B/Esc, Ajustes e Inicio", t_navegacion_atajos_y_ajustes),
 ]:
     caso(nombre, fn)
 app.destroy()

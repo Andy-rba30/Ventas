@@ -229,6 +229,13 @@ class PantallaMovimiento(ctk.CTkFrame):
         entry.bind("<Escape>", lambda e: cerrar_entry())
 
     # ------------------------------------------------------------------ utilidades
+    def limpiar_seleccion(self):
+        """Esc: quita el producto elegido y la selección del carrito (el carrito no se vacía)."""
+        self.producto_sel = None
+        self.lbl_sel_prod.configure(text="---")
+        self.tabla_productos.deseleccionar()
+        self.tabla_carrito.deseleccionar()
+
     def _limpiar_tras_procesar(self):
         self.vaciar_carrito()
         self.ent_buscar.delete(0, tk.END)

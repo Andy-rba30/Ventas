@@ -25,6 +25,7 @@ Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 
 main.py                    punto de entrada
 agro/config.py             constantes (ruta BD, CLIENTE_GENERAL, umbral de stock...)
 agro/registro.py           logger 'agro' -> app.log
+agro/preferencias.py       config.json junto a la BD: apariencia, geometría, último respaldo
 agro/db/                   SQLite. BaseDatos = Conexion + repositorios
    conexion.py             PRAGMAs, transaccion(), respaldo, introspección; llama a migraciones
    esquema.py              DDL v1 (productos, clientes, proveedores, encargadas, boletas,
@@ -46,11 +47,18 @@ agro/ui/tema.py            tokens: COLOR (semánticos), ESPACIO, fuente(nombre),
 agro/ui/componentes.py     Tabla (Treeview+scroll, filas dict, arbol=True), Columna,
                            Tarjeta, Encabezado, Campo (validación visual), Toast,
                            boton_primario/info/exito/alerta/fiado/peligro/secundario
-agro/ui/app.py             Aplicacion: sidebar, navegación, refrescos cruzados, app.toast
-agro/ui/dialogos.py        calendario, alta rápida de contacto, historial de cliente
-agro/ui/pantallas/         una pantalla por archivo; Ventas y Compras heredan de
+agro/ui/app.py             Aplicacion: sidebar (NAVEGACION), encargada activa, atajos
+                           F1-F8/Ctrl+B/Esc, apariencia, respaldo, refrescos cruzados, app.toast
+agro/ui/dialogos.py        calendario, alta rápida de contacto, elegir_opcion, historial de cliente
+agro/ui/pantallas/         una pantalla por archivo (inicio, ventas, compras, fiados, inventario,
+                           contactos, reportes, ajustes); Ventas y Compras heredan de
                            movimiento_base.PantallaMovimiento
 ```
+Protocolo opcional de una pantalla (la app llama lo que exista): `al_mostrar()`,
+`refrescar_productos()`, `refrescar_contactos(clientes, proveedores)`, `refrescar_fiados()`,
+`limpiar_seleccion()` (Esc) y el atributo `ent_buscar` (Ctrl+B). Para añadir una pantalla
+basta con sumar una entrada a `NAVEGACION` en app.py.
+
 Refrescos cruzados: una pantalla nunca toca widgets de otra. Llama a
 `app.refrescar_productos()`, `app.refrescar_contactos()`, `app.refrescar_fiados()`
 o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite.
@@ -83,5 +91,5 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 hecho (tokens y componentes).
-Siguiente: Prompt 4.2 (sidebar limpio y pantalla Ajustes).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 y 4.2 hechos (tokens, componentes,
+sidebar, Ajustes, Inicio básico, atajos). Siguiente: Prompt 4.3 (Ventas y Compras unificadas).

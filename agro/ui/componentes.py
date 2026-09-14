@@ -276,6 +276,39 @@ def boton_secundario(parent, texto, command, **kw):
     return ctk.CTkButton(parent, text=texto, command=command, **kw)
 
 
+class BotonNavegacion(ctk.CTkButton):
+    """Botón del sidebar: transparente en reposo, relleno primario cuando su pantalla está activa."""
+
+    def __init__(self, parent, texto, command, **kw):
+        kw.setdefault("height", 40)
+        kw.setdefault("anchor", "w")
+        kw.setdefault("corner_radius", ESPACIO["s"])
+        kw.setdefault("font", fuente("boton"))
+        super().__init__(parent, text=texto, command=command, **kw)
+        self.set_activo(False)
+
+    def set_activo(self, activo):
+        if activo:
+            self.configure(fg_color=COLOR["primario"], hover_color=COLOR["primario_hover"], text_color="#FFFFFF")
+        else:
+            self.configure(fg_color="transparent", hover_color=(COLOR["neutro"], "#3A3A3A"),
+                           text_color=(COLOR["texto_oscuro"], "#E5E5E5"))
+
+
+# ----------------------------------------------------------------------------- Seccion
+class Seccion(ctk.CTkFrame):
+    """Bloque con título para pantallas de formulario (Ajustes, detalle). Coloca widgets en `cuerpo`."""
+
+    def __init__(self, parent, titulo, descripcion=None, **kw):
+        super().__init__(parent, **kw)
+        ctk.CTkLabel(self, text=titulo, font=fuente("subtitulo"), anchor="w").pack(fill="x", padx=ESPACIO["m"], pady=(ESPACIO["m"], 0))
+        if descripcion:
+            ctk.CTkLabel(self, text=descripcion, font=fuente("cuerpo"), text_color=COLOR["texto_suave"], anchor="w",
+                         justify="left", wraplength=720).pack(fill="x", padx=ESPACIO["m"], pady=(ESPACIO["xs"], 0))
+        self.cuerpo = ctk.CTkFrame(self, fg_color="transparent")
+        self.cuerpo.pack(fill="x", padx=ESPACIO["m"], pady=ESPACIO["m"])
+
+
 # ----------------------------------------------------------------------------- Toast
 class Toast:
     """Aviso no bloqueante en la esquina inferior derecha de una ventana."""
