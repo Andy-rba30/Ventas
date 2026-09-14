@@ -96,12 +96,18 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · Prompt 1.1 ✅ · Prompt 1.2 ✅.
-> Verificación automatizada en `scripts/prueba_carrito.py` (UI, con Xvfb) y
-> `scripts/prueba_bd.py` (capa de datos). Fase 1 completa. Siguiente: Prompt 2.1.
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ (paquete `agro/`, entrada
+> `main.py`, `ventas.py` es un stub). Verificación automatizada en
+> `scripts/prueba_carrito.py` (UI, con Xvfb, 14 casos) y `scripts/prueba_bd.py`
+> (datos + servicios, 13 casos). Siguiente: Prompt 2.2.
 >
-> Nota para 2.2: los dos scripts anteriores ya cubren gran parte de los casos
-> pedidos; el prompt debe convertirlos a pytest, no reescribirlos.
+> Desvíos respecto al prompt 2.1: el servicio de venta/compra se llama
+> `servicios/operaciones.py` (no `servicios/ventas.py`) para no confundirlo con
+> `ui/pantallas/ventas.py`; y Ventas/Compras comparten
+> `ui/pantallas/movimiento_base.py`, lo que adelanta parte del 4.3.
+>
+> Nota para 2.2: los dos scripts ya cubren gran parte de los casos pedidos; el
+> prompt debe convertirlos a pytest, no reescribirlos.
 
 ### Prompt 1.1 – Crash al agregar al carrito y edición de celdas
 

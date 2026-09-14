@@ -1,19 +1,21 @@
-"""Prueba headless del flujo de carrito (Ventas y Compras).
+"""Prueba headless de la interfaz (Ventas, Compras, Fiados, Reportes).
 
 Uso: xvfb-run -a python scripts/prueba_carrito.py        (Linux sin pantalla)
      python scripts/prueba_carrito.py                   (Windows/macOS, la ventana queda oculta)
 
-Crea una BD temporal, simula selección, agregado, edición de celdas y quitado de ítems.
-No toca la BD real. Sale con código 1 si algo falla.
+Crea una BD temporal, simula selección, agregado, edición de celdas, quitado de ítems,
+venta, fiado, cobro, compra y eliminación de operaciones. No toca la BD real.
+Sale con código 1 si algo falla.
 """
-import sys, os, importlib, tempfile, traceback
+import os
+import sys
+import tempfile
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 
-mod_name = "ventas"
-workdir = tempfile.mkdtemp()
-os.chdir(workdir)  # la BD negocio_final_stock.db se crea aquí, no en el repo
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+workdir = tempfile.mkdtemp()
+os.chdir(workdir)  # la BD se crea aquí, no en el repo
 
 avisos = []
 messagebox.showwarning = lambda t, m, **k: avisos.append(("warn", m))
@@ -22,15 +24,16 @@ messagebox.showinfo = lambda t, m, **k: avisos.append(("info", m))
 messagebox.askyesno = lambda t, m, **k: True
 simpledialog.askfloat = lambda *a, **k: k.get("initialvalue", 1.0)
 
-mod = importlib.import_module(mod_name)
-app = mod.Aplicacion()
-app.withdraw()
-app.update()
+from agro.ui.app import Aplicacion  # noqa: E402
 
-def seleccionar_primero(tree):
-    hijos = tree.get_children()
-    assert hijos, "tabla vacía"
-    tree.selection_set(hijos[0]); tree.focus(hijos[0]); app.update()
+app = Aplicacion(os.path.join(workdir, "prueba.db"))
+# Tk solo calcula la geometría de las tablas (bbox) si la ventana se mostró al menos una vez.
+app.update(); app.deiconify(); app.update(); app.withdraw(); app.update()
+ventas = app.pantallas["ventas"]
+compras = app.pantallas["compras"]
+fiados = app.pantallas["fiados"]
+reportes = app.pantallas["reportes"]
+db = app.db
 
 fallos = []
 def caso(nombre, fn):
@@ -39,42 +42,46 @@ def caso(nombre, fn):
     except Exception as e:
         fallos.append(nombre); print(f"  FAIL {nombre}: {type(e).__name__}: {e}")
 
-# Datos
-assert app.db.agregar_producto("UREA", 120.0, 100.0, 10)
-assert app.db.agregar_producto("FOSFATO", 90.0, 70.0, 3)
-app.cargar_tabla_productos(); app.update()
+def seleccionar_primero(tree):
+    hijos = tree.get_children()
+    assert hijos, "tabla vacía"
+    tree.selection_set(hijos[0]); tree.focus(hijos[0]); app.update()
+
+def poner(entry, texto):
+    entry.delete(0, tk.END); entry.insert(0, texto)
+
+# Datos: FOSFATO es el primero por orden alfabético
+assert db.productos.agregar("UREA", 120.0, 100.0, 10)
+assert db.productos.agregar("FOSFATO", 90.0, 70.0, 3)
+app.refrescar_productos(); app.update()
 
 def t_doble_agregado():
-    seleccionar_primero(app.tree_ventas)
-    app.ent_cantidad_ventas.insert(0, "1/2"); app.agregar_al_carrito_ventas(); app.update()
-    # segunda vez: la tabla ya se recargó y perdió la selección → aquí fallaba con IndexError
-    app.ent_cantidad_ventas.insert(0, "2"); app.agregar_al_carrito_ventas(); app.update()
-    assert len(app.carrito_ventas) == 2, app.carrito_ventas
-    assert app.lbl_total_ventas.cget("text") == "TOTAL: S/. 225.00", app.lbl_total_ventas.cget("text")
+    seleccionar_primero(ventas.tree_productos)
+    poner(ventas.ent_cantidad, "1/2"); ventas.agregar_al_carrito(); app.update()
+    # segunda vez: la tabla ya se recargó y perdió la selección; antes fallaba con IndexError
+    poner(ventas.ent_cantidad, "2"); ventas.agregar_al_carrito(); app.update()
+    assert len(ventas.carrito) == 2
+    assert ventas.lbl_total.cget("text") == "TOTAL: S/. 225.00", ventas.lbl_total.cget("text")
 
 def t_agregar_tras_buscar():
-    app.ent_buscar_ventas.insert(0, "fos"); app.ent_buscar_ventas.event_generate("<KeyRelease>"); app.update()
-    app.ent_cantidad_ventas.insert(0, "1"); app.agregar_al_carrito_ventas(); app.update()
-    assert len(app.carrito_ventas) == 3
-    # el producto sigue marcado en la tabla tras la recarga
-    sel = app.tree_ventas.selection()
-    assert sel and app.tree_ventas.item(sel[0])['values'][0] == "FOSFATO", sel
+    poner(ventas.ent_buscar, "fos"); ventas.ent_buscar.event_generate("<KeyRelease>"); app.update()
+    poner(ventas.ent_cantidad, "1"); ventas.agregar_al_carrito(); app.update()
+    assert len(ventas.carrito) == 3
+    sel = ventas.tree_productos.selection()
+    assert sel and ventas.tree_productos.item(sel[0])['values'][0] == "FOSFATO", sel
 
 def t_stock_mostrado_descuenta_carrito():
-    fila = app.tree_ventas.item(app.tree_ventas.get_children()[0])['values']
-    assert float(fila[2]) == 3 - 3.5, fila
+    fila = ventas.tree_productos.item(ventas.tree_productos.get_children()[0])['values']
+    assert float(fila[2]) == 3 - 3.5 and 'bajo_stock' in ventas.tree_productos.item(ventas.tree_productos.get_children()[0])['tags'], fila
 
 def editar(col, texto, cerrar_con):
-    tree = app.tree_cart_ventas
+    tree = ventas.tree_carrito
     iid = tree.get_children()[0]
     x, y, w, h = tree.bbox(iid, col)
     ev = tk.Event(); ev.x = x + w // 2; ev.y = y + h // 2
-    fn = getattr(app, "editar_celda_carrito", None)
-    if fn: fn(ev, "ventas")
-    else: app.editar_celda_carrito_ventas(ev)
-    app.update()
-    entry = [c for c in tree.winfo_children() if isinstance(c, tk.Entry) or c.winfo_class() == "TEntry"][-1]
-    entry.delete(0, tk.END); entry.insert(0, texto)
+    ventas._editar_celda(ev); app.update()
+    entry = [c for c in tree.winfo_children() if c.winfo_class() == "TEntry"][-1]
+    poner(entry, texto)
     if cerrar_con == "return":
         entry.event_generate("<Return>"); app.update()
         entry.event_generate("<FocusOut>"); app.update()   # el doble disparo
@@ -83,109 +90,107 @@ def editar(col, texto, cerrar_con):
 
 def t_editar_cantidad_enter():
     editar('#3', "4", "return")
-    assert app.carrito_ventas[0]['cantidad'] == 4 and app.carrito_ventas[0]['subtotal'] == 360.0, app.carrito_ventas[0]
+    assert ventas.carrito[0].cantidad == 4 and ventas.carrito[0].subtotal == 360.0, ventas.carrito[0]
 
 def t_editar_subtotal_focusout():
     editar('#4', "450", "focusout")
-    assert app.carrito_ventas[0]['subtotal'] == 450.0 and app.carrito_ventas[0]['precio_unit'] == 90.0
+    assert ventas.carrito[0].subtotal == 450.0 and ventas.carrito[0].precio_unit == 90.0
 
 def t_editar_invalido():
     n = len(avisos); editar('#3', "abc", "return")
     assert avisos[n:] and avisos[-1][0] == "error", avisos[n:]
 
 def t_quitar():
-    app.tree_cart_ventas.selection_set(app.tree_cart_ventas.get_children()[0])
-    (app.quitar_del_carrito("ventas") if hasattr(app, "quitar_del_carrito") else app.quitar_del_carrito_ventas())
-    assert len(app.carrito_ventas) == 2
-
-def t_parse_div_cero():
-    try: app.parse_cantidad("1/0")
-    except ValueError: return
-    raise AssertionError("no lanzó ValueError")
+    n = len(avisos); ventas.quitar_del_carrito(); assert avisos[n:] and avisos[-1][0] == "warn"
+    ventas.tree_carrito.selection_set(ventas.tree_carrito.get_children()[0])
+    ventas.quitar_del_carrito()
+    assert len(ventas.carrito) == 2
 
 def t_compras_doble():
-    seleccionar_primero(app.tree_compras)
-    app.ent_cantidad_compras.insert(0, "5"); app.agregar_al_carrito_compras(); app.update()
-    app.ent_cantidad_compras.insert(0, "5"); app.agregar_al_carrito_compras(); app.update()
-    assert len(app.carrito_compras) == 2 and app.carrito_compras[0]['precio_unit'] == 70.0
+    seleccionar_primero(compras.tree_productos)
+    poner(compras.ent_cantidad, "5"); compras.agregar_al_carrito(); app.update()
+    poner(compras.ent_cantidad, "5"); compras.agregar_al_carrito(); app.update()
+    assert len(compras.carrito) == 2 and compras.carrito[0].precio_unit == 70.0
 
 def t_producto_borrado():
-    app.db.eliminar_producto("FOSFATO"); app.cargar_tabla_productos(); app.update()
-    # seleccionar FOSFATO antes de borrarlo no es posible ya; forzamos el estado
-    if hasattr(app, "producto_sel"):
-        app.producto_sel["ventas"] = {"nombre": "FOSFATO", "precio": 90.0, "precio_compra": 70.0, "stock": 3.0}
-        n = len(avisos); app.ent_cantidad_ventas.insert(0, "1"); app.agregar_al_carrito_ventas()
-        assert avisos[n:] and "ya no existe" in avisos[-1][1]
-
-def t_finalizar_venta():
-    app.procesar_boleta("VENTA"); app.update()
-    assert app.carrito_ventas == [] and app.db.obtener_producto("UREA")["stock"] == 10 - 4 - 1 + 4 - 4  # ver detalle abajo
+    db.productos.eliminar("FOSFATO"); app.refrescar_productos(); app.update()
+    n = len(avisos); poner(ventas.ent_cantidad, "1"); ventas.agregar_al_carrito()
+    assert avisos[n:] and "ya no existe" in avisos[-1][1] and ventas.producto_sel is None
 
 def t_finalizar_venta_y_fiado():
-    app.vaciar_carrito("ventas")
-    app.producto_sel["ventas"] = app.db.obtener_producto("UREA")
-    app.ent_cantidad_ventas.delete(0, tk.END); app.ent_cantidad_ventas.insert(0, "2"); app.agregar_al_carrito_ventas()
-    app.procesar_boleta("VENTA"); app.update()
-    assert app.carrito_ventas == [] and app.db.obtener_producto("UREA")["stock"] == 8
-    # fiado a PÚBLICO GENERAL se rechaza y el carrito se conserva
-    app.ent_cantidad_ventas.insert(0, "1"); app.agregar_al_carrito_ventas()
-    n = len(avisos); app.procesar_boleta("FIADO")
-    assert avisos[n:] and len(app.carrito_ventas) == 1 and app.db.obtener_producto("UREA")["stock"] == 8
-    app.db.agregar_contacto("cliente", "JUAN", "", ""); app.actualizar_combos_personas(); app.combo_cliente_venta.set("JUAN")
-    app.procesar_boleta("FIADO"); app.update()
-    assert app.db.obtener_producto("UREA")["stock"] == 7 and len(app.db.obtener_deudas_pendientes()) == 1
+    ventas.vaciar_carrito(); poner(ventas.ent_buscar, "")
+    ventas.producto_sel = db.productos.obtener("UREA")
+    poner(ventas.ent_cantidad, "2"); ventas.agregar_al_carrito()
+    ventas.procesar(fiado=False); app.update()
+    assert ventas.carrito.vacio and db.productos.obtener("UREA").stock == 8 and avisos[-1][0] == "info"
+    n = len(avisos); ventas.procesar(fiado=False); assert avisos[n:] and "vacío" in avisos[-1][1]
+    poner(ventas.ent_cantidad, "1"); ventas.agregar_al_carrito()
+    n = len(avisos); ventas.procesar(fiado=True)
+    assert avisos[n:] and "cliente" in avisos[-1][1] and len(ventas.carrito) == 1 and db.productos.obtener("UREA").stock == 8
+    db.contactos.agregar("cliente", "JUAN", "", ""); app.refrescar_contactos(); ventas.combo_cliente.set("JUAN")
+    ventas.procesar(fiado=True); app.update()
+    assert db.productos.obtener("UREA").stock == 7 and len(db.transacciones.deudas_pendientes()) == 1
+    assert len(fiados.tree_fiados.get_children()) == 1  # la pantalla Fiados se refrescó sola
 
 def t_cobrar_deuda_ui():
-    app.cargar_fiados(); app.update()
-    app.tree_fiados.selection_set(app.tree_fiados.get_children()[0])
+    fiados.tree_fiados.selection_set(fiados.tree_fiados.get_children()[0])
     app.combo_encargada.set("Administradora")
-    app.cobrar_deuda(); app.update()
-    assert app.db.obtener_deudas_pendientes() == []
-    cobro = app.db.cursor.execute("SELECT encargada, cantidad, ref_id FROM transacciones WHERE tipo='COBRO_DEUDA'").fetchone()
+    fiados.cobrar_deuda(); app.update()
+    assert db.transacciones.deudas_pendientes() == [] and fiados.tree_fiados.get_children() == ()
+    cobro = db.cursor.execute("SELECT encargada, cantidad, ref_id FROM transacciones WHERE tipo='COBRO_DEUDA'").fetchone()
     assert cobro[0] == "Administradora" and cobro[1] == 0 and cobro[2] is not None, cobro
 
 def t_compra_ui():
-    app.db.agregar_contacto("proveedor", "AGROSUR", "", ""); app.actualizar_combos_personas()
+    db.contactos.agregar("proveedor", "AGROSUR", "", ""); app.refrescar_contactos()
     simpledialog.askfloat = lambda *a, **k: 110.0
-    app.vaciar_carrito("compras")
-    app.producto_sel["compras"] = app.db.obtener_producto("UREA")
-    app.ent_cantidad_compras.delete(0, tk.END); app.ent_cantidad_compras.insert(0, "10"); app.agregar_al_carrito_compras()
-    app.procesar_boleta_compra(); app.update()
-    p = app.db.obtener_producto("UREA")
-    assert app.carrito_compras == [] and p["stock"] == 17 and p["precio_compra"] == 110.0, p
+    compras.vaciar_carrito()
+    compras.producto_sel = db.productos.obtener("UREA")
+    poner(compras.ent_cantidad, "10"); compras.agregar_al_carrito()
+    compras.procesar(); app.update()
+    p = db.productos.obtener("UREA")
+    assert compras.carrito.vacio and p.stock == 17 and p.precio_compra == 110.0, p
+    # inventario refrescado: la fila de UREA muestra el nuevo stock
+    inv = app.pantallas["productos"].tree_precios
+    assert any(i['values'][0] == "UREA" and float(i['values'][1]) == 17 for i in map(inv.item, inv.get_children()))
 
 def t_borrar_operacion_ui():
-    app.generar_reporte_mensual(); app.update()
+    reportes.generar(); app.update()
+    assert "17" in reportes.card_stock_total.cget("text")
     def fila_tipo(tipo):
-        for iid in app.tree_mensual.get_children():
-            if app.tree_mensual.item(iid)["values"][2] == tipo: return iid
+        for iid in reportes.tree_mensual.get_children():
+            if reportes.tree_mensual.item(iid)["values"][2] == tipo: return iid
         raise AssertionError(f"sin fila {tipo}")
-    # borrar el FIADO ya pagado se bloquea con aviso
-    app.tree_mensual.selection_set(fila_tipo("FIADO")); n = len(avisos); app.borrar_operacion(); app.update()
-    assert avisos[n:] and "pagados" in avisos[-1][1] and app.db.cursor.execute("SELECT count(*) FROM transacciones WHERE tipo='FIADO'").fetchone()[0] == 1
-    # borrar el COBRO reabre el fiado
-    app.tree_mensual.selection_set(fila_tipo("COBRO_DEUDA")); app.borrar_operacion(); app.update()
-    assert len(app.db.obtener_deudas_pendientes()) == 1
-    # y ahora el FIADO sí se borra devolviendo stock
-    app.tree_mensual.selection_set(fila_tipo("FIADO")); app.borrar_operacion(); app.update()
-    assert app.db.obtener_deudas_pendientes() == [] and app.db.obtener_producto("UREA")["stock"] == 18
+    reportes.tree_mensual.selection_set(fila_tipo("FIADO")); n = len(avisos); reportes.borrar_operacion(); app.update()
+    assert avisos[n:] and "pagados" in avisos[-1][1] and db.cursor.execute("SELECT count(*) FROM transacciones WHERE tipo='FIADO'").fetchone()[0] == 1
+    reportes.tree_mensual.selection_set(fila_tipo("COBRO_DEUDA")); reportes.borrar_operacion(); app.update()
+    assert len(db.transacciones.deudas_pendientes()) == 1
+    reportes.tree_mensual.selection_set(fila_tipo("FIADO")); reportes.borrar_operacion(); app.update()
+    assert db.transacciones.deudas_pendientes() == [] and db.productos.obtener("UREA").stock == 18
 
-print(f"== {mod_name} ==")
+def t_navegacion_y_contactos():
+    app.mostrar_pantalla("contactos"); app.update()
+    cont = app.pantallas["contactos"]
+    assert any(cont.tree_clientes.item(i)['values'][1] == "JUAN" for i in cont.tree_clientes.get_children())
+    poner(cont.ent_prov_nom, "semillas sur"); cont.guardar("proveedor")
+    assert "SEMILLAS SUR" in compras.combo_proveedor.cget("values") and "SEMILLAS SUR" in reportes.combo_prov.cget("values")
+    app.mostrar_pantalla("ventas")
+
+print("== interfaz ==")
 for nombre, fn in [
     ("doble agregado del mismo producto", t_doble_agregado),
     ("agregar tras escribir en el buscador", t_agregar_tras_buscar),
-    ("stock mostrado descuenta el carrito", t_stock_mostrado_descuenta_carrito),
+    ("stock mostrado descuenta el carrito y marca bajo stock", t_stock_mostrado_descuenta_carrito),
     ("editar cantidad con Enter (+FocusOut)", t_editar_cantidad_enter),
     ("editar subtotal con FocusOut", t_editar_subtotal_focusout),
     ("edición inválida muestra error", t_editar_invalido),
     ("quitar ítem", t_quitar),
-    ("parse_cantidad 1/0 -> ValueError", t_parse_div_cero),
     ("compras: doble agregado", t_compras_doble),
     ("producto borrado avisa en vez de fallar", t_producto_borrado),
     ("finalizar venta y fiado (atómico, cliente obligatorio)", t_finalizar_venta_y_fiado),
     ("cobrar deuda desde la UI con encargada actual", t_cobrar_deuda_ui),
-    ("ingreso de mercadería actualiza stock y costo", t_compra_ui),
+    ("ingreso de mercadería actualiza stock, costo e inventario", t_compra_ui),
     ("eliminar operaciones: bloqueo de fiado pagado y reapertura", t_borrar_operacion_ui),
+    ("navegación y refresco cruzado de contactos", t_navegacion_y_contactos),
 ]:
     caso(nombre, fn)
 app.destroy()

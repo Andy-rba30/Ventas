@@ -16,8 +16,17 @@ pip install -r requirements.txt
 ## Ejecutar
 
 ```bash
-python ventas.py
+python main.py
 ```
+
+(`ventas.py` se conserva como acceso directo obsoleto: solo llama a `main`.)
+
+## Estructura
+
+- `agro/db/`: SQLite (conexión, migraciones, repositorios de productos, transacciones y contactos).
+- `agro/servicios/`: lógica de negocio sin interfaz (carrito, operaciones, reportes, formato).
+- `agro/ui/`: ventana principal, diálogos y una pantalla por archivo.
+- `scripts/`: pruebas automatizadas con BD temporal (`prueba_bd.py`, `prueba_carrito.py`).
 
 La base de datos `negocio_final_stock.db` se crea automáticamente en la carpeta
 desde donde se ejecuta el programa.

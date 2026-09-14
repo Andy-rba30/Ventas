@@ -9,14 +9,38 @@ cuentas por cobrar y reportes mensuales. Moneda: soles peruanos (S/.).
 ## Ejecutar
 ```bash
 pip install -r requirements.txt
-python ventas.py
+python main.py          # (ventas.py es un stub obsoleto que llama a main)
 ```
 La BD `negocio_final_stock.db` y el log `app.log` se crean en la carpeta desde
 donde se ejecuta. En Linux hace falta `python3-tk`.
 
 Pruebas (sin tocar la BD real):
-- Capa de datos: `python scripts/prueba_bd.py`
+- Capa de datos y servicios: `python scripts/prueba_bd.py`
 - Interfaz headless: `xvfb-run -a python scripts/prueba_carrito.py`
+
+## Estructura
+```
+main.py                    punto de entrada
+agro/config.py             constantes (ruta BD, CLIENTE_GENERAL, umbral de stock...)
+agro/registro.py           logger 'agro' -> app.log
+agro/db/                   SQLite. BaseDatos = Conexion + repositorios
+   conexion.py             PRAGMAs, esquema, migraciones, transaccion(), respaldo
+   productos.py            db.productos.*   (dataclass Producto)
+   transacciones.py        db.transacciones.* (fiados, cobros, reversión)
+   contactos.py            db.contactos.*   (clientes, proveedores, encargadas)
+agro/servicios/            lógica de negocio sin Tk
+   formato.py              moneda(), cantidad(), parse_cantidad(), MESES
+   carrito.py              Carrito / LineaCarrito
+   operaciones.py          ServicioOperaciones: venta, fiado, compra, cobro, eliminar
+   reportes.py             ServicioReportes: Reporte por periodo (pandas por ahora)
+agro/ui/app.py             Aplicacion: sidebar, navegación, refrescos cruzados
+agro/ui/dialogos.py        calendario, alta rápida de contacto, historial de cliente
+agro/ui/pantallas/         una pantalla por archivo; Ventas y Compras heredan de
+                           movimiento_base.PantallaMovimiento
+```
+Refrescos cruzados: una pantalla nunca toca widgets de otra. Llama a
+`app.refrescar_productos()`, `app.refrescar_contactos()`, `app.refrescar_fiados()`
+o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite.
 
 ## Convenciones
 - Código, comentarios, mensajes de UI y commits en español. Funciones en
@@ -24,9 +48,12 @@ Pruebas (sin tocar la BD real):
 - Nunca `except:` desnudo ni `except Exception: pass`. Captura la excepción
   concreta y regístrala con `logging` (logger `agro`).
 - Toda operación de BD que toque más de una fila o más de una tabla va dentro
-  de `with self.db.transaccion():` para que se guarde todo o nada.
-- La UI no ejecuta SQL: llama a métodos de `BaseDatos`.
-- `ventas.py` usa finales de línea CRLF; conservarlos al editar.
+  de `with db.transaccion():` para que se guarde todo o nada.
+- La UI no ejecuta SQL ni contiene reglas de negocio: llama a `agro.servicios`
+  o a los repositorios de `agro.db`. Las validaciones de negocio lanzan
+  `ErrorOperacion` con el mensaje listo para mostrar.
+- Formato de dinero y cantidades solo con `formato.moneda()` y `formato.cantidad()`.
+- Finales de línea LF en todo el paquete.
 
 ## Datos de la usuaria
 - Nunca borrar, sobrescribir ni migrar sin respaldo el archivo
@@ -34,4 +61,4 @@ Pruebas (sin tocar la BD real):
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fase 0 y Fase 1 completas. Siguiente: Prompt 2.1.
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 y 1 completas; 2.1 hecho. Siguiente: Prompt 2.2.
