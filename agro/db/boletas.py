@@ -67,6 +67,15 @@ class Pago:
     notas: str
 
 
+@dataclass
+class Deudor:
+    cliente: str
+    n_boletas: int
+    deuda: float
+    fecha_mas_antigua: str
+    dias: int
+
+
 def _boleta(row):
     return Boleta(row[0], row[1], row[2], row[3], row[4] or "", row[5] or "", row[6], float(row[7]), row[8], row[9] or "", float(row[10]))
 
@@ -144,6 +153,35 @@ class RepositorioBoletas:
             sql += " AND c.nombre=?"
             params = (cliente,)
         return round(float(self.cx.cursor.execute(sql, params).fetchone()[0]), 2)
+
+    def resumen_deudores(self, hoy=None):
+        """Un Deudor por cliente con saldo, del fiado más antiguo al más reciente."""
+        hoy = hoy or datetime.date.today()
+        filas = self.cx.cursor.execute("""
+            SELECT c.nombre, COUNT(*), SUM(b.total - COALESCE((SELECT SUM(monto) FROM pagos WHERE boleta_id=b.id), 0)), MIN(b.fecha)
+            FROM boletas b JOIN clientes c ON c.id = b.cliente_id
+            WHERE b.tipo='FIADO' AND b.estado != 'PAGADO'
+            GROUP BY c.nombre ORDER BY MIN(b.fecha), c.nombre
+        """).fetchall()
+        deudores = []
+        for nombre, n, deuda, fecha_min in filas:
+            try:
+                dias = (hoy - datetime.date.fromisoformat(fecha_min)).days
+            except ValueError:
+                dias = 0
+            deudores.append(Deudor(nombre, int(n), round(float(deuda), 2), fecha_min, dias))
+        return deudores
+
+    def pagos_de_cliente(self, cliente):
+        """Pagos de todos los fiados del cliente, del más reciente al más antiguo."""
+        return [Pago(*r) for r in self.cx.cursor.execute("""
+            SELECT g.id, g.boleta_id, g.fecha, g.hora, g.monto, e.nombre, g.notas
+            FROM pagos g
+            JOIN boletas b ON b.id = g.boleta_id
+            JOIN clientes c ON c.id = b.cliente_id
+            JOIN encargadas e ON e.id = g.encargada_id
+            WHERE c.nombre=? ORDER BY g.fecha DESC, g.hora DESC, g.id DESC
+        """, (cliente,))]
 
     # --- pagos --------------------------------------------------------------
     def registrar_pago(self, boleta_id, monto, encargada_id, fecha=None, hora=None, notas=""):

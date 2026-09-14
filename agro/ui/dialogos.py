@@ -4,7 +4,7 @@ import tkinter as tk
 import customtkinter as ctk
 from tkcalendar import Calendar
 
-from agro.servicios.formato import cantidad, moneda
+from agro.servicios.formato import cantidad, hoy, moneda
 from agro.ui.componentes import Campo, Columna, Tabla, boton_exito, boton_primario, boton_secundario
 from agro.ui.tema import COLOR, ESPACIO, fuente
 
@@ -160,6 +160,85 @@ class DialogoCantidad(ctk.CTkToplevel):
             return
         self.destroy()
         self.al_confirmar(cant, precio)
+
+
+class DialogoPago(ctk.CTkToplevel):
+    """Registro de un pago (total o parcial) de un fiado. No bloquea: al confirmar llama a
+    al_confirmar(monto, fecha, encargada, nota) y se cierra."""
+
+    def __init__(self, parent, cliente, saldo, encargadas, encargada_actual, al_confirmar, fecha=None):
+        super().__init__(parent)
+        self.al_confirmar = al_confirmar
+        self.saldo = saldo
+        self.title("Registrar pago")
+        self.geometry("360x400")
+        self.resizable(False, False)
+        self.grab_set()
+
+        ctk.CTkLabel(self, text=f"Pago de {cliente}", font=fuente("subtitulo")).pack(pady=(ESPACIO["m"], 0), padx=ESPACIO["m"])
+        ctk.CTkLabel(self, text=f"Saldo de la boleta: {moneda(saldo)}", font=fuente("cuerpo"), text_color=COLOR["texto_suave"]).pack(pady=(0, ESPACIO["s"]))
+
+        self.campo_monto = Campo(self, "Monto (S/.), puede ser parcial:", ancho=300, tipo="dinero", horizontal=False, obligatorio=True)
+        self.campo_monto.pack(padx=ESPACIO["m"], pady=(0, ESPACIO["s"]), fill="x")
+        self.campo_monto.set(f"{saldo:.2f}")
+
+        ctk.CTkLabel(self, text="Fecha:", font=fuente("cuerpo")).pack(anchor="w", padx=ESPACIO["m"])
+        f_fecha = ctk.CTkFrame(self, fg_color="transparent")
+        f_fecha.pack(fill="x", padx=ESPACIO["m"], pady=(0, ESPACIO["s"]))
+        self.ent_fecha = ctk.CTkEntry(f_fecha, justify="center")
+        self.ent_fecha.pack(side="left", fill="x", expand=True)
+        self.ent_fecha.insert(0, fecha or hoy())
+        self.ent_fecha.configure(state="readonly")
+        boton_secundario(f_fecha, "📆", lambda: abrir_calendario_popup(self, self.ent_fecha), width=36).pack(side="left", padx=(ESPACIO["xs"], 0))
+
+        ctk.CTkLabel(self, text="Encargada:", font=fuente("cuerpo")).pack(anchor="w", padx=ESPACIO["m"])
+        self.combo_encargada = ctk.CTkOptionMenu(self, values=list(encargadas) or [encargada_actual], width=300)
+        self.combo_encargada.set(encargada_actual)
+        self.combo_encargada.pack(anchor="w", padx=ESPACIO["m"], pady=(0, ESPACIO["s"]))
+
+        self.campo_nota = Campo(self, "Nota (opcional):", ancho=300, horizontal=False)
+        self.campo_nota.pack(padx=ESPACIO["m"], pady=(0, ESPACIO["s"]), fill="x")
+
+        botones = ctk.CTkFrame(self, fg_color="transparent")
+        botones.pack(pady=ESPACIO["m"])
+        boton_exito(botones, "Registrar pago", self.confirmar, width=140).pack(side="left", padx=ESPACIO["xs"])
+        boton_secundario(botones, "Cancelar", self.destroy, width=120).pack(side="left", padx=ESPACIO["xs"])
+        self.bind("<Return>", lambda e: self.confirmar())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.after(50, self.campo_monto.focus)
+
+    def confirmar(self):
+        try:
+            monto = self.campo_monto.valor()
+        except ValueError:
+            return False
+        if monto <= 0 or monto > self.saldo + 0.005:
+            self.campo_monto._marcar(False)
+            return False
+        fecha, encargada, nota = self.ent_fecha.get(), self.combo_encargada.get(), self.campo_nota.get()
+        self.destroy()
+        self.al_confirmar(monto, fecha, encargada, nota)
+        return True
+
+
+def abrir_detalle_boleta(parent, boleta):
+    """Líneas de una boleta concreta (producto, cantidad, precio unitario, subtotal)."""
+    top = ctk.CTkToplevel(parent)
+    top.title(f"Boleta #{boleta.id}")
+    top.geometry("600x400")
+    top.grab_set()
+    ctk.CTkLabel(top, text=f"{boleta.tipo} #{boleta.id} · {boleta.fecha} {boleta.hora} · {boleta.persona}", font=fuente("subtitulo")).pack(pady=(ESPACIO["m"], 0))
+    ctk.CTkLabel(top, text=f"Total {moneda(boleta.total)} · Pagado {moneda(boleta.pagado)} · Saldo {moneda(boleta.saldo)} · {boleta.estado}",
+                 font=fuente("cuerpo"), text_color=COLOR["texto_suave"]).pack(pady=(0, ESPACIO["s"]))
+    tabla = Tabla(top, [
+        Columna("producto", "Producto", 240), Columna("cantidad", "Cantidad", 80, "center"),
+        Columna("punit", "P. Unit", 90, "e"), Columna("subtotal", "Subtotal", 100, "e"),
+    ])
+    tabla.pack(fill="both", expand=True, padx=ESPACIO["m"], pady=ESPACIO["s"])
+    tabla.cargar([{"producto": l.producto, "cantidad": cantidad(l.cantidad), "punit": moneda(l.precio_unit), "subtotal": moneda(l.subtotal)}
+                  for l in boleta.lineas])
+    boton_secundario(top, "Cerrar", top.destroy).pack(pady=ESPACIO["s"])
+    return top
 
 
 def abrir_historial_cliente(parent, cliente, filas):

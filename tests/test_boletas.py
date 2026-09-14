@@ -158,3 +158,55 @@ def test_id_encargada_crear(con_datos):
     id_ = con_datos.contactos.id_encargada("Nadie", crear=True)
     assert id_ and con_datos.contactos.id_encargada("Nadie") == id_
     assert "Nadie" not in con_datos.contactos.encargadas()
+
+
+# --- deudores, pagos parciales e historial ----------------------------------
+
+def test_varios_pagos_parciales_nunca_superan_el_total(con_datos, fiado):
+    admin = _ids(con_datos)["admin"]
+    for monto in (100, 200, 59.99):
+        con_datos.boletas.registrar_pago(fiado, monto, admin)
+    b = con_datos.boletas.obtener(fiado)
+    assert b.estado == "PARCIAL" and b.pagado == 359.99 and b.saldo == 0.01
+    with pytest.raises(ValueError):
+        con_datos.boletas.registrar_pago(fiado, 0.02, admin)      # supera el saldo
+    con_datos.boletas.registrar_pago(fiado, 0.01, admin)
+    b = con_datos.boletas.obtener(fiado)
+    assert b.estado == "PAGADO" and b.saldo == 0 and len(con_datos.boletas.pagos_de(fiado)) == 4
+    with pytest.raises(ValueError):
+        con_datos.boletas.registrar_pago(fiado, 1, admin)         # ya no hay saldo
+
+
+def test_resumen_deudores(con_datos, fiado):
+    import datetime
+    ids = _ids(con_datos)
+    con_datos.contactos.agregar("cliente", "ANA", "", "")
+    ana = con_datos.contactos.id_de("cliente", "ANA")
+    con_datos.boletas.crear("2026-08-01", "FIADO", ids["admin"], [(ids["fosfato"], 1, 90, 90, 4)], cliente_id=ana)
+    con_datos.boletas.crear("2026-09-05", "FIADO", ids["admin"], [(ids["fosfato"], 2, 90, 180, 2)], cliente_id=ana)
+    con_datos.boletas.registrar_pago(fiado, 60, ids["admin"])
+    deudores = con_datos.boletas.resumen_deudores(hoy=datetime.date(2026, 9, 14))
+    assert [(d.cliente, d.n_boletas, d.deuda, d.fecha_mas_antigua, d.dias) for d in deudores] == [
+        ("ANA", 2, 270, "2026-08-01", 44),      # la deuda más antigua primero
+        ("JUAN", 1, 300, "2026-09-03", 11),
+    ]
+    # al pagar todo, el cliente desaparece del resumen
+    con_datos.boletas.registrar_pago(fiado, 300, ids["admin"])
+    assert [d.cliente for d in con_datos.boletas.resumen_deudores()] == ["ANA"]
+    assert con_datos.boletas.resumen_deudores.__doc__  # documentado
+
+
+def test_resumen_deudores_vacio(db):
+    assert db.boletas.resumen_deudores() == []
+
+
+def test_pagos_de_cliente_mas_reciente_primero(con_datos, fiado):
+    ids = _ids(con_datos)
+    f2 = con_datos.boletas.crear("2026-09-04", "FIADO", ids["admin"], [(ids["fosfato"], 1, 90, 90, 4)], cliente_id=ids["juan"])
+    con_datos.boletas.registrar_pago(fiado, 50, ids["admin"], fecha="2026-09-10", hora="10:00:00", notas="adelanto")
+    con_datos.boletas.registrar_pago(f2, 90, ids["admin"], fecha="2026-09-12", hora="09:00:00")
+    con_datos.boletas.registrar_pago(fiado, 10, ids["admin"], fecha="2026-09-12", hora="11:00:00")
+    pagos = con_datos.boletas.pagos_de_cliente("JUAN")
+    assert [(p.boleta_id, p.monto, p.fecha, p.notas) for p in pagos] == [
+        (fiado, 10, "2026-09-12", ""), (f2, 90, "2026-09-12", ""), (fiado, 50, "2026-09-10", "adelanto")]
+    assert con_datos.boletas.pagos_de_cliente("NADIE") == []

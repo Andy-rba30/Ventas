@@ -57,7 +57,11 @@ agro/ui/pantallas/         una pantalla por archivo (inicio, fiados, inventario,
                            carrito pasa por dialogos.DialogoCantidad (no bloqueante, callback).
                            Inventario y Contactos son maestro-detalle: tabla 65 % + panel 35 %
                            con un Formulario* (cargar/leer/enfocar); el alta reutiliza el mismo
-                           formulario dentro de dialogos.DialogoFormulario
+                           formulario dentro de dialogos.DialogoFormulario.
+                           Fiados: deudores (db.boletas.resumen_deudores) a la izquierda; a la
+                           derecha boletas con saldo, dialogos.DialogoPago (parcial o total) e
+                           historial (pagos_de_cliente). seleccionar_cliente(nombre) lo usa
+                           Contactos > Ver fiados
 ```
 Protocolo opcional de una pantalla (la app llama lo que exista): `al_mostrar()`,
 `refrescar_productos()`, `refrescar_contactos(clientes, proveedores)`, `refrescar_fiados()`,
@@ -96,9 +100,10 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 a 4.4 hechos (tokens, componentes,
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 a 4.5 hechos (tokens, componentes,
 sidebar, Ajustes, Inicio básico, atajos, Ventas/Compras unificadas, Inventario y Contactos en
-maestro-detalle, esquema v2). Siguiente: Prompt 4.5 (Fiados por cliente y pagos parciales).
+maestro-detalle, esquema v2, Fiados por cliente con pagos parciales). Siguiente: Prompt 4.6
+(Reportes en dos niveles e Inicio completo).
 
 Nota para pruebas de UI headless: una ventana `withdraw()` no recibe teclas sintéticas
 (`event_generate` de F-keys, Supr, KeyRelease); para probar atajos hay que `deiconify()` +

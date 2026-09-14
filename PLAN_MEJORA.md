@@ -96,8 +96,12 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅.
-> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.5). El 4.4 dejó Inventario y
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅.
+> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.6). El 4.5 dejó Fiados con la
+> tabla de deudores (cliente, boletas, deuda, más antigua, días; en rojo pasados 30 días),
+> tarjeta de total por cobrar, panel del cliente con sus boletas con saldo (doble clic =
+> detalle), diálogo de pago con monto parcial, fecha, encargada y nota, e historial de
+> pagos. Sin botón "Actualizar". Pruebas: 143 pytest + 18 de UI. El 4.4 dejó Inventario y
 > Contactos en maestro-detalle (tabla 65 % + panel 35 %, alta en diálogo con el mismo
 > formulario, desactivar/reactivar productos, "Mostrar inactivos", deuda por cliente y
 > "Ver fiados" que filtra la pantalla Fiados). Para el campo Notas de contactos se añadió

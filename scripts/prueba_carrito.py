@@ -162,15 +162,31 @@ def t_finalizar_venta_y_fiado():
     assert ventas.procesar() is True; app.update()
     assert db.productos.obtener("UREA").stock == 7 and len(db.boletas.deudas_pendientes()) == 1
     assert "JUAN" in toasts[-1][1] and ventas.seg_tipo.get() == "Contado"
-    assert len(fiados.tabla_fiados.iids()) == 1  # la pantalla Fiados se refrescó sola
+    assert [fiados.tabla_deudores.valores(i)["cliente"] for i in fiados.tabla_deudores.iids()] == ["JUAN"]  # Fiados se refrescó sola
 
 def t_cobrar_deuda_ui():
-    fiados.tabla_fiados.seleccionar_iid(fiados.tabla_fiados.iids()[0])
+    app.mostrar_pantalla("fiados"); app.update()
+    assert fiados.cliente_sel is None and fiados.card_total.cget("text").endswith("S/. 120.00")
+    assert fiados.seleccionar_cliente("JUAN") is True; app.update()
+    assert fiados.lbl_cliente.cget("text") == "JUAN" and len(fiados.tabla_boletas.iids()) == 1
+    assert fiados.tabla_boletas.seleccion()["saldo"] == "S/. 120.00"  # la boleta queda preseleccionada
     app.set_encargada("Administradora")
-    fiados.cobrar_deuda(); app.update()
-    assert db.boletas.deudas_pendientes() == [] and fiados.tabla_fiados.iids() == ()
-    cobro = db.cursor.execute("SELECT e.nombre, g.monto, g.boleta_id FROM pagos g JOIN encargadas e ON e.id=g.encargada_id").fetchone()
-    assert cobro[0] == "Administradora" and cobro[1] == 120 and cobro[2] is not None, cobro
+    # pago parcial: el diálogo rechaza montos mayores al saldo y acepta uno menor
+    dlg = fiados.abrir_dialogo_pago(); app.update()
+    assert dlg.campo_monto.get() == "120.00" and dlg.combo_encargada.get() == "Administradora"
+    dlg.campo_monto.set("500"); assert dlg.confirmar() is False and dlg.winfo_exists()
+    dlg.campo_monto.set("20"); dlg.campo_nota.set("adelanto"); assert dlg.confirmar() is True; app.update()
+    b = db.boletas.deudas_pendientes("JUAN")[0]
+    assert (b.estado, b.pagado, b.saldo) == ("PARCIAL", 20, 100)
+    assert fiados.cliente_sel == "JUAN" and fiados.tabla_boletas.seleccion()["saldo"] == "S/. 100.00"
+    assert [fiados.tabla_pagos.valores(i)["nota"] for i in fiados.tabla_pagos.iids()] == ["adelanto"]
+    # pago del resto: el cliente desaparece de los deudores y el panel se oculta
+    dlg = fiados.abrir_dialogo_pago(); assert dlg.campo_monto.get() == "100.00"; assert dlg.confirmar() is True; app.update()
+    assert db.boletas.deudas_pendientes() == [] and fiados.tabla_deudores.iids() == () and fiados.cliente_sel is None
+    pagos = db.cursor.execute("SELECT e.nombre, g.monto FROM pagos g JOIN encargadas e ON e.id=g.encargada_id ORDER BY g.id").fetchall()
+    assert pagos == [("Administradora", 20), ("Administradora", 100)], pagos
+    assert fiados.seleccionar_cliente("JUAN") is False  # sin deuda: aviso, no panel
+    app.mostrar_pantalla("ventas")
 
 def t_compra_ui():
     db.contactos.agregar("proveedor", "AGROSUR", "", ""); app.refrescar_contactos()
@@ -200,8 +216,9 @@ def t_borrar_operacion_ui():
         raise AssertionError(f"sin fila {tipo}")
     reportes.tabla_mensual.seleccionar_iid(fila_tipo("FIADO")); n = len(avisos); reportes.borrar_operacion(); app.update()
     assert avisos[n:] and "pagos" in avisos[-1][1] and db.cursor.execute("SELECT count(*) FROM boletas WHERE tipo='FIADO'").fetchone()[0] == 1
-    reportes.tabla_mensual.seleccionar_iid(fila_tipo("COBRO_DEUDA")); reportes.borrar_operacion(); app.update()
-    assert len(db.boletas.deudas_pendientes()) == 1
+    for _ in range(2):  # dos pagos: al borrar ambos el fiado vuelve a PENDIENTE
+        reportes.tabla_mensual.seleccionar_iid(fila_tipo("COBRO_DEUDA")); reportes.borrar_operacion(); app.update()
+    assert len(db.boletas.deudas_pendientes()) == 1 and db.boletas.deudas_pendientes()[0].estado == "PENDIENTE"
     reportes.tabla_mensual.seleccionar_iid(fila_tipo("FIADO")); reportes.borrar_operacion(); app.update()
     assert db.boletas.deudas_pendientes() == [] and db.productos.obtener("UREA").stock == 18
 
@@ -236,9 +253,10 @@ def t_navegacion_y_contactos():
     sec_cli.formulario.telefono.set("555"); sec_cli.formulario.notas.insert("1.0", "vecina"); assert sec_cli.guardar_cambios() is True
     c = db.contactos.obtener("cliente", "ANA"); assert (c.telefono, c.notas) == ("555", "vecina")
     sec_cli.ver_fiados(); app.update()
-    assert app.pantalla_actual == "fiados" and fiados.filtro_cliente == "ANA"
-    assert [fiados.tabla_fiados.valores(i)["cliente"] for i in fiados.tabla_fiados.iids()] == ["ANA"]
-    fiados.filtrar_cliente(None); assert fiados.filtro_cliente is None
+    assert app.pantalla_actual == "fiados" and fiados.cliente_sel == "ANA" and fiados.lbl_cliente.cget("text") == "ANA"
+    assert fiados.tabla_deudores.seleccion()["cliente"] == "ANA"
+    fiados.ver_detalle_boleta(); app.update()  # doble clic: detalle de la boleta
+    fiados.limpiar_seleccion(); assert fiados.cliente_sel is None
     # PÚBLICO GENERAL no se puede eliminar
     app.mostrar_pantalla("contactos"); sec_cli.tabla.seleccionar_por_valor("nombre", "PÚBLICO GENERAL"); app.update()
     assert sec_cli.btn_eliminar.cget("state") == "disabled"
@@ -338,7 +356,7 @@ for nombre, fn in [
     ("fiado bloqueado con PÚBLICO GENERAL", t_fiado_bloqueado_con_publico_general),
     ("producto desactivado avisa en vez de fallar", t_producto_borrado),
     ("cobrar al contado y fiar a un cliente (Toast, refresco de Fiados)", t_finalizar_venta_y_fiado),
-    ("cobrar deuda desde la UI con encargada actual", t_cobrar_deuda_ui),
+    ("fiados por cliente: pago parcial y total por diálogo", t_cobrar_deuda_ui),
     ("ingreso de mercadería con precio editable en el diálogo", t_compra_ui),
     ("eliminar operaciones: bloqueo de fiado pagado y reapertura", t_borrar_operacion_ui),
     ("contactos maestro-detalle: alta, duplicado, notas, deuda y Ver fiados", t_navegacion_y_contactos),

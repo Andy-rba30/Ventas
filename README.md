@@ -46,7 +46,7 @@ y Supr quita la línea seleccionada del carrito.
 | Ventas      | Buscar producto, doble clic o Enter para elegir cantidad (acepta 1/2), carrito editable, un solo botón Cobrar / Registrar fiado con el monto |
 | Compras     | Misma pantalla que Ventas en modo compra: cantidad y costo unitario por línea, actualiza stock y costo de referencia |
 | Contactos   | Maestro-detalle: tabla a la izquierda, ficha editable a la derecha (documento, teléfono, notas), deuda pendiente y acceso a sus fiados |
-| Fiados      | Cuentas por cobrar, registro de pagos e historial por cliente |
+| Fiados      | Deudores con días de antigüedad; por cliente, sus boletas con saldo, pagos parciales o totales con fecha, encargada y nota, e historial de pagos |
 | Inventario  | Maestro-detalle: tabla con unidad, stock, mínimo, precios y margen; ficha editable; desactivar/reactivar; ver inactivos |
 | Reportes    | Filtro por mes/día/cliente/proveedor, tarjetas resumen, gráfico y exportación a Excel |
 | Inicio      | Deuda total, productos bajo mínimo y accesos a Nueva venta / Ingreso de mercadería |
