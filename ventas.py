@@ -219,6 +219,12 @@ class BaseDatos:
 
     def obtener_todos_productos(self):
         return self.cursor.execute("SELECT nombre, precio, precio_compra, stock FROM productos ORDER BY nombre").fetchall()
+
+    def obtener_producto(self, nombre):
+        """Devuelve un dict con los datos actuales del producto o None si no existe."""
+        row = self.cursor.execute("SELECT nombre, precio, precio_compra, stock FROM productos WHERE nombre=?", (nombre,)).fetchone()
+        if not row: return None
+        return {"nombre": row[0], "precio": float(row[1] or 0.0), "precio_compra": float(row[2] or 0.0), "stock": float(row[3] or 0.0)}
     
     def obtener_lista_nombres_productos(self):
         return [row[0] for row in self.cursor.execute("SELECT nombre FROM productos ORDER BY nombre")]
@@ -260,8 +266,11 @@ class Aplicacion(ctk.CTk):
         self.geometry("1200x800")
         self.db = BaseDatos()
         
-        self.carrito_ventas = [] 
+        self.carrito_ventas = []
         self.carrito_compras = []
+        # Producto seleccionado en cada pantalla (dict de BaseDatos.obtener_producto o None).
+        # Se guarda como estado porque el Treeview pierde la selección al recargarse.
+        self.producto_sel = {"ventas": None, "compras": None}
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -279,11 +288,15 @@ class Aplicacion(ctk.CTk):
         self.seleccionar_frame("ventas")
 
     def parse_cantidad(self, valor_str):
+        """Convierte '1.5', '0,5' o '1/2' en float. Lanza ValueError si no es válido."""
         valor_str = str(valor_str).strip().replace(',', '.')
-        if '/' in valor_str:
-            num, den = valor_str.split('/')
-            return float(num) / float(den)
-        return float(valor_str)
+        try:
+            if '/' in valor_str:
+                num, den = valor_str.split('/')
+                return float(num) / float(den)
+            return float(valor_str)
+        except ZeroDivisionError:
+            raise ValueError("El denominador de la fracción no puede ser cero")
 
     def crear_sidebar(self):
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
@@ -419,7 +432,7 @@ class Aplicacion(ctk.CTk):
 
         scroll_inv.pack(side="right", fill="y")
         self.tree_ventas.pack(side="left", fill="both", expand=True)
-        self.tree_ventas.bind("<<TreeviewSelect>>", lambda e: self.al_seleccionar_producto(self.tree_ventas, self.lbl_sel_prod_ventas))
+        self.tree_ventas.bind("<<TreeviewSelect>>", lambda e: self.al_seleccionar_producto("ventas"))
 
         f_acciones = ctk.CTkFrame(frame_main, width=350)
         f_acciones.grid(row=0, column=1, padx=(0, 15), pady=15, sticky="nsew")
@@ -451,7 +464,7 @@ class Aplicacion(ctk.CTk):
         self.tree_cart_ventas.heading("Subt", text="Subt"); self.tree_cart_ventas.column("Subt", width=60, anchor="e")
         self.tree_cart_ventas.pack(fill="x", padx=20, pady=5)
         
-        self.tree_cart_ventas.bind("<Double-1>", self.editar_celda_carrito_ventas)
+        self.tree_cart_ventas.bind("<Double-1>", lambda e: self.editar_celda_carrito(e, "ventas"))
         ctk.CTkLabel(f_acciones, text="(Doble clic en Precio, Cantidad o Subtotal para editar)", font=ctk.CTkFont(size=11, slant="italic")).pack()
 
         self.lbl_total_ventas = ctk.CTkLabel(f_acciones, text="TOTAL: S/. 0.00", font=ctk.CTkFont(size=16, weight="bold"), text_color="#D32F2F")
@@ -459,7 +472,7 @@ class Aplicacion(ctk.CTk):
 
         f_botones_cart = ctk.CTkFrame(f_acciones, fg_color="transparent")
         f_botones_cart.pack(fill="x", padx=20, pady=(0, 10))
-        ctk.CTkButton(f_botones_cart, text="🗑️ Quitar Item", fg_color="#FF9800", hover_color="#F57C00", command=self.quitar_del_carrito_ventas).pack(side="left", expand=True, padx=(0, 5))
+        ctk.CTkButton(f_botones_cart, text="🗑️ Quitar Item", fg_color="#FF9800", hover_color="#F57C00", command=lambda: self.quitar_del_carrito("ventas")).pack(side="left", expand=True, padx=(0, 5))
         ctk.CTkButton(f_botones_cart, text="🗑️ Vaciar Todo", fg_color="#F44336", hover_color="#D32F2F", command=lambda: self.vaciar_carrito("ventas")).pack(side="right", expand=True, padx=(5, 0))
 
         # Selección de Cliente
@@ -506,7 +519,7 @@ class Aplicacion(ctk.CTk):
 
         scroll_inv.pack(side="right", fill="y")
         self.tree_compras.pack(side="left", fill="both", expand=True)
-        self.tree_compras.bind("<<TreeviewSelect>>", lambda e: self.al_seleccionar_producto(self.tree_compras, self.lbl_sel_prod_compras))
+        self.tree_compras.bind("<<TreeviewSelect>>", lambda e: self.al_seleccionar_producto("compras"))
 
         f_acciones = ctk.CTkFrame(frame_main, width=350)
         f_acciones.grid(row=0, column=1, padx=(0, 15), pady=15, sticky="nsew")
@@ -538,17 +551,15 @@ class Aplicacion(ctk.CTk):
         self.tree_cart_compras.heading("Subt", text="Subt"); self.tree_cart_compras.column("Subt", width=60, anchor="e")
         self.tree_cart_compras.pack(fill="x", padx=20, pady=5)
 
-        # SE AGREGÓ LA INTERACCIÓN DE DOBLE CLIC AQUÍ
-        self.tree_cart_compras.bind("<Double-1>", self.editar_celda_carrito_compras)
+        self.tree_cart_compras.bind("<Double-1>", lambda e: self.editar_celda_carrito(e, "compras"))
         ctk.CTkLabel(f_acciones, text="(Doble clic en Precio, Cantidad o Subtotal para editar)", font=ctk.CTkFont(size=11, slant="italic")).pack()
 
         self.lbl_total_compras = ctk.CTkLabel(f_acciones, text="TOTAL GASTO: S/. 0.00", font=ctk.CTkFont(size=16, weight="bold"), text_color="#2196F3")
         self.lbl_total_compras.pack(anchor="e", padx=20, pady=(0, 5))
 
-        # SE MODIFICÓ LA LISTA DE BOTONES AQUÍ
         f_botones_cart_comp = ctk.CTkFrame(f_acciones, fg_color="transparent")
         f_botones_cart_comp.pack(fill="x", padx=20, pady=(0, 10))
-        ctk.CTkButton(f_botones_cart_comp, text="🗑️ Quitar Item", fg_color="#FF9800", hover_color="#F57C00", command=self.quitar_del_carrito_compras).pack(side="left", expand=True, padx=(0, 5))
+        ctk.CTkButton(f_botones_cart_comp, text="🗑️ Quitar Item", fg_color="#FF9800", hover_color="#F57C00", command=lambda: self.quitar_del_carrito("compras")).pack(side="left", expand=True, padx=(0, 5))
         ctk.CTkButton(f_botones_cart_comp, text="🗑️ Vaciar Todo", fg_color="#F44336", hover_color="#D32F2F", command=lambda: self.vaciar_carrito("compras")).pack(side="right", expand=True, padx=(5, 0))
 
         # Selección de Proveedor
@@ -822,151 +833,82 @@ class Aplicacion(ctk.CTk):
 
     # --- LÓGICAS GENERALES ---
     
-    def quitar_del_carrito_ventas(self):
-        seleccion = self.tree_cart_ventas.selection()
+    def _widgets_carrito(self, tipo):
+        """Devuelve (treeview, lista_carrito) del carrito de ventas o compras."""
+        if tipo == "ventas":
+            return self.tree_cart_ventas, self.carrito_ventas
+        return self.tree_cart_compras, self.carrito_compras
+
+    def quitar_del_carrito(self, tipo):
+        tree, carrito = self._widgets_carrito(tipo)
+        seleccion = tree.selection()
         if not seleccion:
             return messagebox.showwarning("Atención", "Selecciona un producto del carrito para quitarlo.")
-        
-        item_id = seleccion[0]
-        idx = self.tree_cart_ventas.index(item_id)
-        
-        del self.carrito_ventas[idx]
-        self.actualizar_cart_ui("ventas")
+        idx = tree.index(seleccion[0])
+        if idx < len(carrito):
+            del carrito[idx]
+        self.actualizar_cart_ui(tipo)
 
-    # SE AGREGÓ FUNCIÓN PARA QUITAR DE COMPRAS
-    def quitar_del_carrito_compras(self):
-        seleccion = self.tree_cart_compras.selection()
-        if not seleccion:
-            return messagebox.showwarning("Atención", "Selecciona un producto del carrito para quitarlo.")
-        
-        item_id = seleccion[0]
-        idx = self.tree_cart_compras.index(item_id)
-        
-        del self.carrito_compras[idx]
-        self.actualizar_cart_ui("compras")
+    def editar_celda_carrito(self, event, tipo):
+        """Edición en línea de Precio (#2), Cantidad (#3) o Subtotal (#4) del carrito."""
+        tree, carrito = self._widgets_carrito(tipo)
+        if tree.identify_region(event.x, event.y) != "cell": return
 
-    def editar_celda_carrito_ventas(self, event):
-        region = self.tree_cart_ventas.identify_region(event.x, event.y)
-        if region != "cell": return
+        item_id = tree.identify_row(event.y)
+        column = tree.identify_column(event.x)
+        if not item_id or column not in ('#2', '#3', '#4'): return
 
-        item_id = self.tree_cart_ventas.identify_row(event.y)
-        column = self.tree_cart_ventas.identify_column(event.x)
+        idx = tree.index(item_id)
+        if idx >= len(carrito): return
+        campo = {'#2': 'precio_unit', '#3': 'cantidad', '#4': 'subtotal'}[column]
+        x, y, width, height = tree.bbox(item_id, column)
 
-        if column not in ('#2', '#3', '#4'): return
-
-        idx = self.tree_cart_ventas.index(item_id)
-        x, y, width, height = self.tree_cart_ventas.bbox(item_id, column)
-
-        prod = self.carrito_ventas[idx]['producto']
-        if column == '#2':
-            val_actual = str(self.carrito_ventas[idx]['precio_unit'])
-        elif column == '#3':
-            val_actual = str(self.carrito_ventas[idx]['cantidad'])
-        else: # '#4' - Subtotal
-            val_actual = str(self.carrito_ventas[idx]['subtotal'])
-
-        entry = ttk.Entry(self.tree_cart_ventas)
+        entry = ttk.Entry(tree)
         entry.place(x=x, y=y, width=width, height=height)
-        entry.insert(0, val_actual)
+        entry.insert(0, str(carrito[idx][campo]))
         entry.select_range(0, tk.END)
         entry.focus()
 
-        def guardar_edicion(e=None):
-            nuevo_val_str = entry.get()
-            entry.destroy()
-            try:
-                # 1. Si editan el Precio Unitario
-                if column == '#2': 
-                    nuevo_precio = float(nuevo_val_str.replace('S/.', '').strip())
-                    if nuevo_precio < 0: raise ValueError
-                    if nuevo_precio != self.carrito_ventas[idx]['precio_unit']:
-                        self.carrito_ventas[idx]['precio_unit'] = nuevo_precio
-                        self.carrito_ventas[idx]['subtotal'] = nuevo_precio * self.carrito_ventas[idx]['cantidad']
-                        
-                # 2. Si editan la Cantidad (recalcula subtotal automático)
-                elif column == '#3': 
-                    nueva_cant = self.parse_cantidad(nuevo_val_str)
-                    if nueva_cant <= 0: raise ValueError
-                    self.carrito_ventas[idx]['cantidad'] = nueva_cant
-                    self.carrito_ventas[idx]['subtotal'] = nueva_cant * self.carrito_ventas[idx]['precio_unit']
-                
-                # 3. Si editan el Subtotal (para descuentos fijos)
-                elif column == '#4':
-                    nuevo_subtotal = float(nuevo_val_str.replace('S/.', '').strip())
-                    if nuevo_subtotal < 0: raise ValueError
-                    # Solo modificamos el subtotal que se cobrará finalmente
-                    self.carrito_ventas[idx]['subtotal'] = nuevo_subtotal
-                    # (Ya no se ajusta el precio_unit, queda como registro del valor original)
-                
-                self.actualizar_cart_ui("ventas")
-            except ValueError:
-                messagebox.showerror("Error", "Por favor ingresa un número numérico válido o fracción (ej. 1/2) mayor a cero.")
+        # <Return> y <FocusOut> disparan ambos guardar_edicion: al destruir el Entry en el
+        # primero, el segundo llegaba sobre un widget muerto (TclError). La bandera evita
+        # que cualquiera de los tres manejadores se ejecute dos veces.
+        cerrado = {"ok": False}
 
-        def cancelar_edicion(e=None):
-            entry.destroy()
-
-        entry.bind("<Return>", guardar_edicion)
-        entry.bind("<FocusOut>", guardar_edicion)
-        entry.bind("<Escape>", cancelar_edicion)
-
-    # SE AGREGÓ FUNCIÓN PARA EDITAR CELDA DE COMPRAS
-    def editar_celda_carrito_compras(self, event):
-        region = self.tree_cart_compras.identify_region(event.x, event.y)
-        if region != "cell": return
-
-        item_id = self.tree_cart_compras.identify_row(event.y)
-        column = self.tree_cart_compras.identify_column(event.x)
-
-        if column not in ('#2', '#3', '#4'): return
-
-        idx = self.tree_cart_compras.index(item_id)
-        x, y, width, height = self.tree_cart_compras.bbox(item_id, column)
-
-        prod = self.carrito_compras[idx]['producto']
-        if column == '#2':
-            val_actual = str(self.carrito_compras[idx]['precio_unit'])
-        elif column == '#3':
-            val_actual = str(self.carrito_compras[idx]['cantidad'])
-        else: # '#4' - Subtotal
-            val_actual = str(self.carrito_compras[idx]['subtotal'])
-
-        entry = ttk.Entry(self.tree_cart_compras)
-        entry.place(x=x, y=y, width=width, height=height)
-        entry.insert(0, val_actual)
-        entry.select_range(0, tk.END)
-        entry.focus()
+        def cerrar_entry():
+            if cerrado["ok"]: return False
+            cerrado["ok"] = True
+            try: entry.destroy()
+            except tk.TclError: pass
+            return True
 
         def guardar_edicion(e=None):
-            nuevo_val_str = entry.get()
-            entry.destroy()
             try:
-                # 1. Si editan el Precio Unitario
-                if column == '#2': 
+                nuevo_val_str = entry.get()
+            except tk.TclError:
+                return
+            if not cerrar_entry(): return
+            try:
+                if campo == 'precio_unit':
                     nuevo_precio = float(nuevo_val_str.replace('S/.', '').strip())
                     if nuevo_precio < 0: raise ValueError
-                    if nuevo_precio != self.carrito_compras[idx]['precio_unit']:
-                        self.carrito_compras[idx]['precio_unit'] = nuevo_precio
-                        self.carrito_compras[idx]['subtotal'] = nuevo_precio * self.carrito_compras[idx]['cantidad']
-                        
-                # 2. Si editan la Cantidad (recalcula subtotal automático)
-                elif column == '#3': 
+                    carrito[idx]['precio_unit'] = nuevo_precio
+                    carrito[idx]['subtotal'] = nuevo_precio * carrito[idx]['cantidad']
+                elif campo == 'cantidad':
                     nueva_cant = self.parse_cantidad(nuevo_val_str)
                     if nueva_cant <= 0: raise ValueError
-                    self.carrito_compras[idx]['cantidad'] = nueva_cant
-                    self.carrito_compras[idx]['subtotal'] = nueva_cant * self.carrito_compras[idx]['precio_unit']
-                
-                # 3. Si editan el Subtotal (para ajustes fijos)
-                elif column == '#4':
+                    carrito[idx]['cantidad'] = nueva_cant
+                    carrito[idx]['subtotal'] = nueva_cant * carrito[idx]['precio_unit']
+                else:
+                    # Subtotal editado a mano (descuento o ajuste fijo): precio_unit queda como registro original.
                     nuevo_subtotal = float(nuevo_val_str.replace('S/.', '').strip())
                     if nuevo_subtotal < 0: raise ValueError
-                    self.carrito_compras[idx]['subtotal'] = nuevo_subtotal
-                
-                self.actualizar_cart_ui("compras")
+                    carrito[idx]['subtotal'] = nuevo_subtotal
+                self.actualizar_cart_ui(tipo)
             except ValueError:
-                messagebox.showerror("Error", "Por favor ingresa un número numérico válido o fracción (ej. 1/2) mayor a cero.")
+                messagebox.showerror("Error", "Por favor ingresa un número válido o fracción (ej. 1/2) mayor a cero.")
 
         def cancelar_edicion(e=None):
-            entry.destroy()
+            cerrar_entry()
 
         entry.bind("<Return>", guardar_edicion)
         entry.bind("<FocusOut>", guardar_edicion)
@@ -1059,44 +1001,57 @@ class Aplicacion(ctk.CTk):
                 top.destroy()
         ctk.CTkButton(top, text="Guardar Rápido", command=guardar).pack(pady=15)
 
+    def _producto_para_carrito(self, tipo):
+        """Relee de la BD el producto seleccionado en la pantalla y actualiza el estado.
+        Devuelve el dict del producto o None (y avisa) si no hay selección o ya no existe."""
+        sel = self.producto_sel.get(tipo)
+        if sel is None:
+            messagebox.showwarning("Atención", "Selecciona un producto primero.")
+            return None
+        prod = self.db.obtener_producto(sel['nombre'])
+        if prod is None:
+            self.producto_sel[tipo] = None
+            (self.lbl_sel_prod_ventas if tipo == "ventas" else self.lbl_sel_prod_compras).configure(text="---")
+            messagebox.showwarning("Atención", f"El producto '{sel['nombre']}' ya no existe en el inventario.")
+            return None
+        self.producto_sel[tipo] = prod
+        return prod
+
     # Lógica de Carrito Ventas
     def agregar_al_carrito_ventas(self):
-        prod = self.lbl_sel_prod_ventas.cget("text")
-        if prod == "---": return messagebox.showwarning("Atención", "Selecciona un producto primero.")
+        prod_sel = self._producto_para_carrito("ventas")
+        if prod_sel is None: return
         try:
             cant = self.parse_cantidad(self.ent_cantidad_ventas.get())
             if cant <= 0: raise ValueError
-        except: return messagebox.showerror("Error", "La cantidad debe ser un número o fracción (ej: 1/2) mayor a cero.")
-        
-        item_id = self.tree_ventas.selection()[0]
-        
-        precio_str = str(self.tree_ventas.item(item_id)['values'][1])
-        precio_venta = float(precio_str.replace('S/.', '').strip())
-        stock_disp = float(self.tree_ventas.item(item_id)['values'][2]) 
-        
+        except ValueError:
+            return messagebox.showerror("Error", "La cantidad debe ser un número o fracción (ej: 1/2) mayor a cero.")
+
+        prod = prod_sel['nombre']
+        precio_venta = prod_sel['precio']
+        en_carrito = sum(float(i['cantidad']) for i in self.carrito_ventas if i['producto'] == prod)
+        stock_disp = prod_sel['stock'] - en_carrito
+
         if stock_disp < cant:
-            if not messagebox.askyesno("Advertencia de Stock", f"Intenta vender más del stock disponible en pantalla ({stock_disp:g}). Quedará negativo.\n\n¿Continuar de todos modos?"):
+            if not messagebox.askyesno("Advertencia de Stock", f"Intenta vender más del stock disponible ({stock_disp:g}). Quedará negativo.\n\n¿Continuar de todos modos?"):
                 return
-            
+
         self.carrito_ventas.append({'producto': prod, 'precio_unit': precio_venta, 'cantidad': cant, 'subtotal': cant * precio_venta})
         self.actualizar_cart_ui("ventas")
         self.ent_cantidad_ventas.delete(0, tk.END)
 
     # Lógica de Carrito Compras
     def agregar_al_carrito_compras(self):
-        prod = self.lbl_sel_prod_compras.cget("text")
-        if prod == "---": return messagebox.showwarning("Atención", "Selecciona un producto primero.")
+        prod_sel = self._producto_para_carrito("compras")
+        if prod_sel is None: return
         try:
             cant = self.parse_cantidad(self.ent_cantidad_compras.get())
             if cant <= 0: raise ValueError
-        except: return messagebox.showerror("Error", "La cantidad debe ser un número o fracción (ej: 1/2) mayor a cero.")
-        
-        item_id = self.tree_compras.selection()[0]
-        
-        costo_str = str(self.tree_compras.item(item_id)['values'][1])
-        costo_sugerido = float(costo_str.replace('S/.', '').strip())
-        
-        costo_unitario = simpledialog.askfloat("Costo Compra", f"Precio UNITARIO de compra para {prod} (S/.):", initialvalue=costo_sugerido)
+        except ValueError:
+            return messagebox.showerror("Error", "La cantidad debe ser un número o fracción (ej: 1/2) mayor a cero.")
+
+        prod = prod_sel['nombre']
+        costo_unitario = simpledialog.askfloat("Costo Compra", f"Precio UNITARIO de compra para {prod} (S/.):", initialvalue=prod_sel['precio_compra'])
         if costo_unitario is None or costo_unitario <= 0: return
 
         self.carrito_compras.append({'producto': prod, 'precio_unit': costo_unitario, 'cantidad': cant, 'subtotal': cant * costo_unitario})
@@ -1330,7 +1285,12 @@ class Aplicacion(ctk.CTk):
             if hasattr(self, 'tree_precios') and self.tree_precios in trees:
                 if target_tree is None or target_tree == self.tree_precios:
                     self.tree_precios.insert("", "end", values=(nombre, f"{stock_float:g}", f"S/. {precio:.2f}", f"S/. {p_comp_val:.2f}"))
-    
+
+        # Recargar el Treeview borra la selección; se restaura desde el estado para que
+        # la usuaria vea marcado el producto que sigue eligiendo.
+        if self.tree_ventas in trees: self._restaurar_seleccion(self.tree_ventas, "ventas")
+        if self.tree_compras in trees: self._restaurar_seleccion(self.tree_compras, "compras")
+
     def cargar_fiados(self):
         for r in self.tree_fiados.get_children(): self.tree_fiados.delete(r)
         for d in self.db.obtener_deudas_pendientes(): 
@@ -1344,9 +1304,26 @@ class Aplicacion(ctk.CTk):
         if messagebox.askyesno("Cobro", f"¿{val[2]} paga {val[5]}?"):
             if self.db.pagar_fiado(val[0]): self.cargar_fiados(); self.generar_reporte_mensual()
 
-    def al_seleccionar_producto(self, tree, label_target):
+    def al_seleccionar_producto(self, tipo):
+        """Guarda como estado el producto elegido en la tabla de Ventas o Compras."""
+        tree = self.tree_ventas if tipo == "ventas" else self.tree_compras
+        label = self.lbl_sel_prod_ventas if tipo == "ventas" else self.lbl_sel_prod_compras
         s = tree.selection()
-        if s: label_target.configure(text=tree.item(s[0])['values'][0])
+        if not s: return
+        nombre = str(tree.item(s[0])['values'][0])
+        prod = self.db.obtener_producto(nombre)
+        self.producto_sel[tipo] = prod
+        label.configure(text=nombre if prod else "---")
+
+    def _restaurar_seleccion(self, tree, tipo):
+        """Tras recargar la tabla, vuelve a marcar la fila del producto en estado si sigue visible."""
+        sel = self.producto_sel.get(tipo)
+        if not sel: return
+        for iid in tree.get_children():
+            if str(tree.item(iid)['values'][0]) == sel['nombre']:
+                tree.selection_set(iid)
+                tree.see(iid)
+                return
 
     def al_seleccionar_producto_tabla_editar(self, event):
         s = self.tree_precios.selection()
