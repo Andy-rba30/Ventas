@@ -96,6 +96,67 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅ · 4.6 ✅ · 5.1 ✅ · 5.2 ✅ · 6.1 ✅.
+> **Plan completo (Fases 0 a 6).** Publicar con un tag `vX.Y.Z` (ver README).
+>
+> Resultado del 5.1 (BD de 20 000 líneas, 6 694 boletas, generada con
+> `scripts/generar_datos_prueba.py`): importar la app pasó de 665 ms a 152 ms (pandas
+> solo pesaba 466 ms); el reporte de un mes pasó de 545 ms a 24 ms (mediana de 5
+> corridas) y el resumen de Inicio de 31 ms a 4 ms, con resultados idénticos. pandas y
+> matplotlib salieron de `requirements.txt`; Excel se escribe con openpyxl en
+> `servicios/exportar.py`. Las consultas viven en `agro/db/reportes.py`
+> (`RepositorioReportes` + `Filtro`); el servicio solo arma dataclasses. El 4.6 dejó Reportes con selector de mes,
+> botón Hoy y filtros plegables (día, cliente, proveedor, tipo) que consultan al cambiar;
+> pestaña Resumen (ingresos, compras, margen bruto = vendido − cantidad × precio_compra
+> actual, por cobrar total con subtexto del periodo, barra caja y movimiento por producto
+> con stock actual) y pestaña Movimientos (boletas con líneas, exportar Excel filtrado a
+> hojas Boletas y Líneas con cabeceras en negrita, eliminar). Se eliminó el gráfico y la
+> dependencia matplotlib. Inicio completo: ventas de hoy, fiados pendientes, bajo mínimo,
+> listas de reposición y fiados > 30 días, accesos rápidos. Nota para 5.2: el margen usa el
+> precio_compra actual del producto; `costo_unit` por línea llega con ese prompt.
+> Pruebas: 149 pytest + 18 de UI. El 4.5 dejó Fiados con la
+> tabla de deudores (cliente, boletas, deuda, más antigua, días; en rojo pasados 30 días),
+> tarjeta de total por cobrar, panel del cliente con sus boletas con saldo (doble clic =
+> detalle), diálogo de pago con monto parcial, fecha, encargada y nota, e historial de
+> pagos. Sin botón "Actualizar". Pruebas: 143 pytest + 18 de UI. El 4.4 dejó Inventario y
+> Contactos en maestro-detalle (tabla 65 % + panel 35 %, alta en diálogo con el mismo
+> formulario, desactivar/reactivar productos, "Mostrar inactivos", deuda por cliente y
+> "Ver fiados" que filtra la pantalla Fiados). Para el campo Notas de contactos se añadió
+> el esquema v2 (migración v1→v2 encadenada, copia previa con la versión en el nombre).
+> Pruebas: 139 pytest + 18 de UI. El 4.3 dejó una sola
+> `PantallaMovimiento(modo)` para Ventas y Compras: encabezado con fecha y
+> cliente/proveedor, buscador con Enter, diálogo de cantidad (precio editable solo en
+> compra), carrito 60/40 con tooltip, un solo botón con el monto (Cobrar / Registrar
+> fiado / Registrar ingreso) deshabilitado con carrito vacío o fiado a PÚBLICO GENERAL,
+> Toast de éxito, y atajos Ctrl+Enter y Supr. Desvío: el botón dice "Registrar fiado"
+> (no "Cobrar") cuando el selector está en Fiado. Pruebas: 130 pytest + 17 de UI. Tras el 4.1 no queda
+> ningún hex, `ttk.Treeview` ni `CTkFont` fuera de `agro/ui/tema.py` y
+> `agro/ui/componentes.py`. El 4.2 dejó el sidebar solo con navegación (Inicio,
+> Ventas, Compras, Fiados, Inventario, Contactos, Reportes, Ajustes), la pantalla
+> Ajustes, `config.json` (apariencia, geometría, último respaldo), minsize 1024x680
+> y atajos F1-F8, Ctrl+B y Esc. Iconos: se quitaron los emojis del menú (texto
+> corto). Inicio existe ya con tarjetas y accesos rápidos; el 4.6 la completa.
+> Pruebas: 130 pytest + 15 de UI. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub. Esquema v1
+> (boletas + líneas + pagos, productos/contactos por id, PRAGMA user_version) con
+> migración automática desde la tabla plana y copia previa en `backups/`.
+> Pruebas: `pytest` (123 casos en `tests/`) y `scripts/prueba_carrito.py` (UI con
+> Xvfb, 14 casos); ambas corren en GitHub Actions con Python 3.11 y 3.12.
+> Siguiente: Prompt 4.1.
+>
+> Notas del 3.1: el modelo ya soporta pagos parciales (`cobrar_fiado(monto=...)`),
+> pero la pantalla Fiados sigue cobrando el saldo completo hasta el 4.5. El reporte
+> ya expone `por_cobrar_total` (deuda global) además de `por_cobrar` del periodo,
+> listo para el 4.6. Las claves `B:`/`L:`/`P:` permiten borrar boletas, líneas o
+> pagos desde el detalle cronológico.
+>
+> Desvíos respecto al prompt 2.1: el servicio de venta/compra se llama
+> `servicios/operaciones.py` (no `servicios/ventas.py`) para no confundirlo con
+> `ui/pantallas/ventas.py`; y Ventas/Compras comparten
+> `ui/pantallas/movimiento_base.py`, lo que adelanta parte del 4.3.
+>
+> Nota para 2.2: los dos scripts ya cubren gran parte de los casos pedidos; el
+> prompt debe convertirlos a pytest, no reescribirlos.
+
 ### Prompt 1.1 – Crash al agregar al carrito y edición de celdas
 
 ```
