@@ -52,6 +52,8 @@ class Conexion:
         destino = sqlite3.connect(ruta_destino)
         try:
             self.conn.backup(destino)
+            # La copia hereda el modo WAL; se pasa a DELETE para que sea un único archivo portable.
+            destino.execute("PRAGMA journal_mode=DELETE")
         finally:
             destino.close()
         log.info("Respaldo creado en %s", ruta_destino)

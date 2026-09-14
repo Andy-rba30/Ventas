@@ -1,0 +1,38 @@
+name: Pruebas
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Instalar Tk y Xvfb del sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xvfb
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Pruebas de datos y servicios
+        run: pytest
+
+      - name: Prueba de interfaz (headless con Xvfb)
+        run: xvfb-run -a python scripts/prueba_carrito.py

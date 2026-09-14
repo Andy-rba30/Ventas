@@ -14,9 +14,11 @@ python main.py          # (ventas.py es un stub obsoleto que llama a main)
 La BD `negocio_final_stock.db` y el log `app.log` se crean en la carpeta desde
 donde se ejecuta. En Linux hace falta `python3-tk`.
 
-Pruebas (sin tocar la BD real):
-- Capa de datos y servicios: `python scripts/prueba_bd.py`
-- Interfaz headless: `xvfb-run -a python scripts/prueba_carrito.py`
+Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 y 3.12):
+- Datos y servicios: `pip install -r requirements-dev.txt && pytest` (carpeta `tests/`,
+  SQLite en memoria; `db_archivo` para WAL/respaldo/migración). Toda función nueva en
+  `agro/db` o `agro/servicios` lleva su prueba aquí.
+- Interfaz headless: `xvfb-run -a python scripts/prueba_carrito.py` (no es pytest).
 
 ## Estructura
 ```
@@ -61,4 +63,5 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 y 1 completas; 2.1 hecho. Siguiente: Prompt 2.2.
+Ver `PLAN_MEJORA.md`. Estado: Fases 0, 1 y 2 completas. Siguiente: Prompt 3.1
+(antes de ejecutarlo, copia manual de la BD real fuera del repo).

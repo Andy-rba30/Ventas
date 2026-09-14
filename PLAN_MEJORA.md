@@ -96,10 +96,12 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ (paquete `agro/`, entrada
-> `main.py`, `ventas.py` es un stub). Verificación automatizada en
-> `scripts/prueba_carrito.py` (UI, con Xvfb, 14 casos) y `scripts/prueba_bd.py`
-> (datos + servicios, 13 casos). Siguiente: Prompt 2.2.
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅. Fases 0 a 2
+> completas. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub.
+> Pruebas: `pytest` (80 casos en `tests/`, SQLite en memoria) y
+> `scripts/prueba_carrito.py` (UI con Xvfb, 14 casos); ambas corren en GitHub
+> Actions con Python 3.11 y 3.12. Siguiente: Prompt 3.1 (haz antes la copia
+> manual de la BD real).
 >
 > Desvíos respecto al prompt 2.1: el servicio de venta/compra se llama
 > `servicios/operaciones.py` (no `servicios/ventas.py`) para no confundirlo con

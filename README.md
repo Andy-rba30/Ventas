@@ -26,7 +26,10 @@ python main.py
 - `agro/db/`: SQLite (conexión, migraciones, repositorios de productos, transacciones y contactos).
 - `agro/servicios/`: lógica de negocio sin interfaz (carrito, operaciones, reportes, formato).
 - `agro/ui/`: ventana principal, diálogos y una pantalla por archivo.
-- `scripts/`: pruebas automatizadas con BD temporal (`prueba_bd.py`, `prueba_carrito.py`).
+- `tests/`: pruebas pytest de datos y servicios con SQLite en memoria (`pip install -r requirements-dev.txt && pytest`).
+- `scripts/prueba_carrito.py`: prueba de la interfaz sin pantalla (`xvfb-run -a python scripts/prueba_carrito.py`).
+
+Ambas corren en GitHub Actions en cada push (Python 3.11 y 3.12).
 
 La base de datos `negocio_final_stock.db` se crea automáticamente en la carpeta
 desde donde se ejecuta el programa.
