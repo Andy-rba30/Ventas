@@ -4,7 +4,7 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from agro.config import CLIENTE_GENERAL, UMBRAL_BAJO_STOCK
+from agro.config import CLIENTE_GENERAL
 from agro.registro import log
 from agro.servicios.formato import cantidad, moneda
 from agro.servicios.operaciones import ErrorOperacion
@@ -46,8 +46,8 @@ class PantallaVentas(PantallaMovimiento):
     # --- productos: el stock mostrado descuenta lo que ya está en el carrito ---
     def _fila_producto(self, p):
         stock_disp = p.stock - self.carrito.cantidad_de(p.nombre)
-        tags = ('bajo_stock',) if stock_disp <= UMBRAL_BAJO_STOCK else ('normal',)
-        return (p.nombre, moneda(p.precio), cantidad(stock_disp)), tags
+        tags = ('bajo_stock',) if stock_disp <= p.stock_minimo else ('normal',)
+        return (p.nombre, moneda(p.precio_venta), cantidad(stock_disp)), tags
 
     def _precio_para(self, prod, cant):
         stock_disp = prod.stock - self.carrito.cantidad_de(prod.nombre)
@@ -55,7 +55,7 @@ class PantallaVentas(PantallaMovimiento):
             if not messagebox.askyesno("Advertencia de Stock",
                                        f"Intenta vender más del stock disponible ({cantidad(stock_disp)}). Quedará negativo.\n\n¿Continuar de todos modos?"):
                 return None
-        return prod.precio
+        return prod.precio_venta
 
     def refrescar_contactos(self, clientes, proveedores):
         if clientes:

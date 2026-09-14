@@ -113,7 +113,7 @@ def t_compras_doble():
     assert len(compras.carrito) == 2 and compras.carrito[0].precio_unit == 70.0
 
 def t_producto_borrado():
-    db.productos.eliminar("FOSFATO"); app.refrescar_productos(); app.update()
+    db.productos.desactivar("FOSFATO"); app.refrescar_productos(); app.update()
     n = len(avisos); poner(ventas.ent_cantidad, "1"); ventas.agregar_al_carrito()
     assert avisos[n:] and "ya no existe" in avisos[-1][1] and ventas.producto_sel is None
 
@@ -129,16 +129,16 @@ def t_finalizar_venta_y_fiado():
     assert avisos[n:] and "cliente" in avisos[-1][1] and len(ventas.carrito) == 1 and db.productos.obtener("UREA").stock == 8
     db.contactos.agregar("cliente", "JUAN", "", ""); app.refrescar_contactos(); ventas.combo_cliente.set("JUAN")
     ventas.procesar(fiado=True); app.update()
-    assert db.productos.obtener("UREA").stock == 7 and len(db.transacciones.deudas_pendientes()) == 1
+    assert db.productos.obtener("UREA").stock == 7 and len(db.boletas.deudas_pendientes()) == 1
     assert len(fiados.tree_fiados.get_children()) == 1  # la pantalla Fiados se refrescó sola
 
 def t_cobrar_deuda_ui():
     fiados.tree_fiados.selection_set(fiados.tree_fiados.get_children()[0])
     app.combo_encargada.set("Administradora")
     fiados.cobrar_deuda(); app.update()
-    assert db.transacciones.deudas_pendientes() == [] and fiados.tree_fiados.get_children() == ()
-    cobro = db.cursor.execute("SELECT encargada, cantidad, ref_id FROM transacciones WHERE tipo='COBRO_DEUDA'").fetchone()
-    assert cobro[0] == "Administradora" and cobro[1] == 0 and cobro[2] is not None, cobro
+    assert db.boletas.deudas_pendientes() == [] and fiados.tree_fiados.get_children() == ()
+    cobro = db.cursor.execute("SELECT e.nombre, g.monto, g.boleta_id FROM pagos g JOIN encargadas e ON e.id=g.encargada_id").fetchone()
+    assert cobro[0] == "Administradora" and cobro[1] == 120 and cobro[2] is not None, cobro
 
 def t_compra_ui():
     db.contactos.agregar("proveedor", "AGROSUR", "", ""); app.refrescar_contactos()
@@ -158,14 +158,14 @@ def t_borrar_operacion_ui():
     assert "17" in reportes.card_stock_total.cget("text")
     def fila_tipo(tipo):
         for iid in reportes.tree_mensual.get_children():
-            if reportes.tree_mensual.item(iid)["values"][2] == tipo: return iid
+            if str(reportes.tree_mensual.item(iid)["values"][2]).startswith(tipo): return iid
         raise AssertionError(f"sin fila {tipo}")
     reportes.tree_mensual.selection_set(fila_tipo("FIADO")); n = len(avisos); reportes.borrar_operacion(); app.update()
-    assert avisos[n:] and "pagados" in avisos[-1][1] and db.cursor.execute("SELECT count(*) FROM transacciones WHERE tipo='FIADO'").fetchone()[0] == 1
+    assert avisos[n:] and "pagos" in avisos[-1][1] and db.cursor.execute("SELECT count(*) FROM boletas WHERE tipo='FIADO'").fetchone()[0] == 1
     reportes.tree_mensual.selection_set(fila_tipo("COBRO_DEUDA")); reportes.borrar_operacion(); app.update()
-    assert len(db.transacciones.deudas_pendientes()) == 1
+    assert len(db.boletas.deudas_pendientes()) == 1
     reportes.tree_mensual.selection_set(fila_tipo("FIADO")); reportes.borrar_operacion(); app.update()
-    assert db.transacciones.deudas_pendientes() == [] and db.productos.obtener("UREA").stock == 18
+    assert db.boletas.deudas_pendientes() == [] and db.productos.obtener("UREA").stock == 18
 
 def t_navegacion_y_contactos():
     app.mostrar_pantalla("contactos"); app.update()

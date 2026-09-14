@@ -148,10 +148,12 @@ class PantallaReportes(ctk.CTkFrame):
 
         for b in rep.boletas:
             titulo = "🛒 TOTAL BOLETA" if len(b.lineas) > 1 else "🛒 BOLETA (1 Item)"
-            padre = self.tree_mensual.insert("", "end", text="➕", values=("", b.fecha, b.tipo, titulo, moneda(b.total), b.persona, b.encargada),
+            tipo = f"{b.tipo} ({b.estado})" if b.tipo == "FIADO" else b.tipo
+            padre = self.tree_mensual.insert("", "end", text="➕", values=(b.clave, b.fecha, tipo, titulo, moneda(b.total), b.persona, b.encargada),
                                              tags=('boleta_total',), open=False)
             for l in b.lineas:
-                self.tree_mensual.insert(padre, "end", text="↳", values=(l.id, "", "", f"{l.producto} (x{cantidad(l.cantidad)})", moneda(l.total), "", ""))
+                detalle = f"{l.producto} (x{cantidad(l.cantidad)})" if l.cantidad else l.producto
+                self.tree_mensual.insert(padre, "end", text="↳", values=(l.clave, "", "", detalle, moneda(l.total), "", ""))
 
         fig = Figure(figsize=(4, 2), dpi=100)
         fig.patch.set_facecolor('#EBEBEB')
@@ -171,23 +173,26 @@ class PantallaReportes(ctk.CTkFrame):
                                                 "(Si seleccionaste una boleta entera, se revertirán todos sus productos)"):
             return
 
-        ids = set()  # evita repetir un ID si se seleccionó padre e hijo
+        # Una boleta seleccionada entera se elimina como boleta ("B:id"); si además se marcó una de
+        # sus líneas, la boleta ya la incluye. Un pago se muestra como boleta COBRO_DEUDA ("P:id").
+        claves = []
+        padres_seleccionados = {iid for iid in seleccion if self.tree_mensual.get_children(iid)}
         for iid in seleccion:
-            hijos = self.tree_mensual.get_children(iid)
-            filas = hijos if hijos else (iid,)
-            for f in filas:
-                id_tx = self.tree_mensual.item(f)['values'][0]
-                if str(id_tx).isdigit(): ids.add(int(id_tx))
-        if not ids: return
+            if self.tree_mensual.parent(iid) in padres_seleccionados:
+                continue
+            clave = str(self.tree_mensual.item(iid)['values'][0])
+            if clave and clave not in claves:
+                claves.append(clave)
+        if not claves: return
 
-        bloqueados, errores = self.app.operaciones.eliminar_operaciones(sorted(ids))
+        bloqueados, errores = self.app.operaciones.eliminar_operaciones(claves)
         self.generar()
         self.app.refrescar_productos()
         self.app.refrescar_fiados()
         if bloqueados:
-            messagebox.showwarning("Fiados ya cobrados",
-                                   f"No se eliminaron {len(bloqueados)} fiado(s) porque ya fueron pagados.\n"
-                                   "Primero elimina el cobro asociado (fila COBRO_DEUDA) y vuelve a intentarlo.")
+            messagebox.showwarning("Fiados con pagos",
+                                   f"No se eliminaron {len(bloqueados)} fiado(s) porque ya tienen pagos registrados.\n"
+                                   "Primero elimina sus pagos (filas COBRO_DEUDA) y vuelve a intentarlo.")
         if errores:
             messagebox.showerror("Error", f"No se pudieron eliminar {len(errores)} fila(s). Revisa app.log.")
 

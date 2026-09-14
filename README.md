@@ -23,7 +23,7 @@ python main.py
 
 ## Estructura
 
-- `agro/db/`: SQLite (conexión, migraciones, repositorios de productos, transacciones y contactos).
+- `agro/db/`: SQLite (conexión, esquema versionado y migraciones, repositorios de productos, boletas/pagos y contactos).
 - `agro/servicios/`: lógica de negocio sin interfaz (carrito, operaciones, reportes, formato).
 - `agro/ui/`: ventana principal, diálogos y una pantalla por archivo.
 - `tests/`: pruebas pytest de datos y servicios con SQLite en memoria (`pip install -r requirements-dev.txt && pytest`).
@@ -44,6 +44,13 @@ desde donde se ejecuta el programa.
 | Fiados      | Cuentas por cobrar, registro de pagos e historial por cliente |
 | Inventario  | Crear, editar y borrar productos; lista de precios y stock |
 | Reportes    | Filtro por mes/día/cliente/proveedor, tarjetas resumen, gráfico y exportación a Excel |
+
+## Migración de datos (v4.1 → v4.2)
+
+Al abrir por primera vez una base de datos de la versión anterior, el programa la
+migra solo al nuevo esquema (boletas con líneas y pagos). Antes guarda una copia en
+`backups/negocio_pre_migracion_<fecha>.db` junto a la base, y conserva la tabla
+antigua como `_legacy_transacciones`. Los detalles quedan en `app.log`.
 
 Consulta [PLAN_MEJORA.md](PLAN_MEJORA.md) para el plan de refactorización y
 mejora de la interfaz.

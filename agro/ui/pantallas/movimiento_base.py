@@ -115,7 +115,7 @@ class PantallaMovimiento(ctk.CTkFrame):
     # ------------------------------------------------------------------ productos
     def _fila_producto(self, p):
         """(values, tags) para la tabla de productos. Sobrescribible."""
-        return (p.nombre, moneda(p.precio), cantidad(p.stock)), ()
+        return (p.nombre, moneda(p.precio_venta), cantidad(p.stock)), ()
 
     def refrescar_productos(self):
         filtro = self.ent_buscar.get().lower()

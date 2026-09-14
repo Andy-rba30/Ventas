@@ -68,7 +68,7 @@ class PantallaInventario(ctk.CTkFrame):
     def refrescar_productos(self):
         for r in self.tree_precios.get_children(): self.tree_precios.delete(r)
         for p in self.app.db.productos.listar():
-            self.tree_precios.insert("", "end", values=(p.nombre, cantidad(p.stock), moneda(p.precio), moneda(p.precio_compra)))
+            self.tree_precios.insert("", "end", values=(p.nombre, cantidad(p.stock), moneda(p.precio_venta), moneda(p.precio_compra)))
         nombres = self.app.db.productos.nombres()
         if nombres:
             self.combo_edit_prod.configure(values=nombres)
@@ -88,7 +88,7 @@ class PantallaInventario(ctk.CTkFrame):
         p = self.app.db.productos.obtener(nombre)
         if p:
             self.e_edit_nom.delete(0, tk.END); self.e_edit_nom.insert(0, p.nombre)
-            self.e_edit_prec.delete(0, tk.END); self.e_edit_prec.insert(0, p.precio)
+            self.e_edit_prec.delete(0, tk.END); self.e_edit_prec.insert(0, p.precio_venta)
             self.e_edit_prec_comp.delete(0, tk.END); self.e_edit_prec_comp.insert(0, p.precio_compra)
             self.e_edit_stk.delete(0, tk.END); self.e_edit_stk.insert(0, cantidad(p.stock))
 
@@ -131,6 +131,8 @@ class PantallaInventario(ctk.CTkFrame):
 
     def borrar_producto(self):
         nombre = self.combo_edit_prod.get()
-        if messagebox.askyesno("Eliminar", f"¿Eliminar '{nombre}'?"):
-            if self.app.db.productos.eliminar(nombre):
+        if not nombre: return
+        if messagebox.askyesno("Eliminar", f"¿Eliminar '{nombre}'?\n\nEl producto dejará de aparecer en Ventas, Compras e Inventario, "
+                                           "pero su historial de boletas se conserva. Si lo vuelves a crear con el mismo nombre se reactiva."):
+            if self.app.db.productos.desactivar(nombre):
                 self.app.refrescar_productos()

@@ -96,12 +96,19 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅. Fases 0 a 2
-> completas. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub.
-> Pruebas: `pytest` (80 casos en `tests/`, SQLite en memoria) y
-> `scripts/prueba_carrito.py` (UI con Xvfb, 14 casos); ambas corren en GitHub
-> Actions con Python 3.11 y 3.12. Siguiente: Prompt 3.1 (haz antes la copia
-> manual de la BD real).
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅. Fases 0 a 3
+> completas. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub. Esquema v1
+> (boletas + líneas + pagos, productos/contactos por id, PRAGMA user_version) con
+> migración automática desde la tabla plana y copia previa en `backups/`.
+> Pruebas: `pytest` (123 casos en `tests/`) y `scripts/prueba_carrito.py` (UI con
+> Xvfb, 14 casos); ambas corren en GitHub Actions con Python 3.11 y 3.12.
+> Siguiente: Prompt 4.1.
+>
+> Notas del 3.1: el modelo ya soporta pagos parciales (`cobrar_fiado(monto=...)`),
+> pero la pantalla Fiados sigue cobrando el saldo completo hasta el 4.5. El reporte
+> ya expone `por_cobrar_total` (deuda global) además de `por_cobrar` del periodo,
+> listo para el 4.6. Las claves `B:`/`L:`/`P:` permiten borrar boletas, líneas o
+> pagos desde el detalle cronológico.
 >
 > Desvíos respecto al prompt 2.1: el servicio de venta/compra se llama
 > `servicios/operaciones.py` (no `servicios/ventas.py`) para no confundirlo con

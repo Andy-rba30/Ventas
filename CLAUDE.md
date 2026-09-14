@@ -26,10 +26,16 @@ main.py                    punto de entrada
 agro/config.py             constantes (ruta BD, CLIENTE_GENERAL, umbral de stock...)
 agro/registro.py           logger 'agro' -> app.log
 agro/db/                   SQLite. BaseDatos = Conexion + repositorios
-   conexion.py             PRAGMAs, esquema, migraciones, transaccion(), respaldo
-   productos.py            db.productos.*   (dataclass Producto)
-   transacciones.py        db.transacciones.* (fiados, cobros, reversión)
-   contactos.py            db.contactos.*   (clientes, proveedores, encargadas)
+   conexion.py             PRAGMAs, transaccion(), respaldo, introspección; llama a migraciones
+   esquema.py              DDL v1 (productos, clientes, proveedores, encargadas, boletas,
+                           boleta_lineas, pagos) + índices. VERSION_ESQUEMA en PRAGMA user_version
+   migraciones.py          v0 (tabla plana transacciones) -> v1, con copia previa en backups/
+                           y la tabla vieja conservada como _legacy_transacciones
+   productos.py            db.productos.*  (dataclass Producto; no se borran: se desactivan)
+   boletas.py              db.boletas.*    (Boleta, LineaBoleta, Pago; pagos parciales;
+                           eliminar_boleta/linea/pago con reversión de stock)
+   contactos.py            db.contactos.*  (clientes, proveedores, encargadas; con historial
+                           se desactivan en vez de borrarse)
 agro/servicios/            lógica de negocio sin Tk
    formato.py              moneda(), cantidad(), parse_cantidad(), MESES
    carrito.py              Carrito / LineaCarrito
@@ -56,6 +62,10 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
   `ErrorOperacion` con el mensaje listo para mostrar.
 - Formato de dinero y cantidades solo con `formato.moneda()` y `formato.cantidad()`.
 - Finales de línea LF en todo el paquete.
+- Cambios de esquema: nueva versión en `esquema.VERSION_ESQUEMA` + función de migración
+  en `migraciones.py` con copia previa; nunca ALTER a mano sobre la BD real.
+- Para eliminar desde el reporte se usan claves `"B:<id>"` (boleta), `"L:<id>"` (línea)
+  y `"P:<id>"` (pago); `ServicioOperaciones.eliminar_operaciones` las interpreta.
 
 ## Datos de la usuaria
 - Nunca borrar, sobrescribir ni migrar sin respaldo el archivo
@@ -63,5 +73,5 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0, 1 y 2 completas. Siguiente: Prompt 3.1
-(antes de ejecutarlo, copia manual de la BD real fuera del repo).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas (esquema v1 con boletas y pagos).
+Siguiente: Prompt 4.1 (tokens de diseño y componentes base).
