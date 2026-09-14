@@ -96,8 +96,8 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅ · 4.6 ✅ · 5.1 ✅ · 5.2 ✅.
-> **Fases 0 a 5 completas.** Siguiente: 6.1 (ejecutable para Windows).
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 ✅ · 4.5 ✅ · 4.6 ✅ · 5.1 ✅ · 5.2 ✅ · 6.1 ✅.
+> **Plan completo (Fases 0 a 6).** Publicar con un tag `vX.Y.Z` (ver README).
 >
 > Resultado del 5.1 (BD de 20 000 líneas, 6 694 boletas, generada con
 > `scripts/generar_datos_prueba.py`): importar la app pasó de 665 ms a 152 ms (pandas

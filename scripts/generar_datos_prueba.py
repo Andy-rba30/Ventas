@@ -12,12 +12,12 @@ import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agro.config import RUTA_BD  # noqa: E402
+from agro.config import NOMBRE_BD  # noqa: E402
 from agro.db import BaseDatos  # noqa: E402
 
 
 def generar(ruta, lineas_objetivo=20000, semilla=7):
-    if os.path.basename(ruta) == RUTA_BD:
+    if os.path.basename(ruta) == NOMBRE_BD:
         raise SystemExit("Esa es la BD real: usa otra ruta.")
     if os.path.exists(ruta):
         os.remove(ruta)

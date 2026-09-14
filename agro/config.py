@@ -1,7 +1,8 @@
 """Constantes de configuración de la aplicación."""
 
 NOMBRE_APP = "Sistema Agro-Negocio Familiar"
-RUTA_BD = "negocio_final_stock.db"
+# Nombre del archivo de la BD; la carpeta la decide agro.rutas (nunca junto al ejecutable).
+NOMBRE_BD = "negocio_final_stock.db"
 
 CLIENTE_GENERAL = "PÚBLICO GENERAL"
 ENCARGADA_DEFAULT = "Administradora"

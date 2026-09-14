@@ -7,7 +7,6 @@ expone los repositorios:
     db.contactos.nombres("cliente")
     with db.transaccion(): ...
 """
-from agro.config import RUTA_BD
 from agro.db.boletas import Boleta, LineaBoleta, Pago, RepositorioBoletas
 from agro.db.conexion import Conexion
 from agro.db.contactos import RepositorioContactos
@@ -19,7 +18,10 @@ __all__ = ["BaseDatos", "Producto", "Boleta", "LineaBoleta", "Pago", "Filtro", "
 
 
 class BaseDatos(Conexion):
-    def __init__(self, ruta=RUTA_BD):
+    def __init__(self, ruta=None):
+        if ruta is None:
+            from agro.rutas import ruta_bd  # import tardío: rutas no depende de db
+            ruta = ruta_bd()
         super().__init__(ruta)
         self.productos = RepositorioProductos(self)
         self.boletas = RepositorioBoletas(self)

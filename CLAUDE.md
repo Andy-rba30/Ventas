@@ -11,8 +11,18 @@ cuentas por cobrar y reportes mensuales. Moneda: soles peruanos (S/.).
 pip install -r requirements.txt
 python main.py          # (ventas.py es un stub obsoleto que llama a main)
 ```
-La BD `negocio_final_stock.db` y el log `app.log` se crean en la carpeta desde
-donde se ejecuta. En Linux hace falta `python3-tk`.
+Los datos (`negocio_final_stock.db`, `config.json`, `app.log`, `backups/`, `boletas/`) viven en la
+carpeta de datos de la usuaria que decide `agro/rutas.py`: `%APPDATA%\AgroNegocio` en Windows,
+`~/.local/share/agro-negocio` en Linux, `~/Library/Application Support/AgroNegocio` en macOS.
+`AGRO_DATOS=<carpeta>` fuerza otra (portable, pruebas manuales). Si `main.py` encuentra una BD
+junto al programa (ubicación de versiones anteriores) la traslada allí una sola vez y avisa.
+En Linux hace falta `python3-tk`.
+
+Ejecutable de Windows: `pip install pyinstaller && pyinstaller agro.spec --noconfirm` produce
+`dist/AgroNegocio/` (onedir, sin consola, icono de `assets/`). El workflow
+`.github/workflows/build.yml` lo construye en `windows-latest` al crear un tag `vX.Y.Z` (debe
+coincidir con `agro.__version__`), hace un arranque de humo del .exe y adjunta el zip al Release.
+Versión única en `agro/__init__.py`; cambios en `CHANGELOG.md`.
 
 Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 y 3.12):
 - Datos y servicios: `pip install -r requirements-dev.txt && pytest` (carpeta `tests/`,
@@ -22,8 +32,12 @@ Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 
 
 ## Estructura
 ```
-main.py                    punto de entrada
-agro/config.py             constantes (ruta BD, CLIENTE_GENERAL, umbral de stock...)
+main.py                    punto de entrada: carpeta de datos, traslado de BD antigua, Aplicacion
+pyproject.toml / agro.spec metadatos del paquete (versión dinámica) / PyInstaller onedir
+assets/                    icono.png e icono.ico (regenerables con scripts/generar_icono.py)
+agro/config.py             constantes (NOMBRE_BD, CLIENTE_GENERAL, umbral de stock...)
+agro/rutas.py              carpeta_datos() por plataforma (o AGRO_DATOS), ruta_bd(), ruta_recurso()
+                           para assets empaquetados (sys._MEIPASS), trasladar_datos_antiguos()
 agro/registro.py           logger 'agro' -> app.log
 agro/preferencias.py       config.json junto a la BD: apariencia, geometría, último respaldo,
                            negocio {nombre, ruc, direccion} para la boleta
@@ -131,10 +145,9 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas; 5.1 hecho (reportes en SQL, sin pandas ni
-matplotlib; `tests/test_arranque.py` vigila que no vuelvan); 5.2 hecho (costo promedio ponderado e
-historial de precios con esquema v3, respaldo automático con rotación, boleta PDF imprimible).
-Siguiente: Prompt 6.1 (ejecutable para Windows).
+Ver `PLAN_MEJORA.md`. Estado: todas las fases (0 a 6) completas. `tests/test_arranque.py` vigila
+que pandas, matplotlib, reportlab y openpyxl no se carguen al arrancar. Para publicar una versión:
+subir `agro.__version__`, anotar `CHANGELOG.md`, commit y `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
 Rendimiento (BD de 20 000 líneas de `scripts/generar_datos_prueba.py`): importar `agro.ui.app`
 665 ms -> 152 ms; `ServicioReportes.generar` de un mes 545 ms -> 24 ms; `resumen_inicio` 31 -> 4 ms.

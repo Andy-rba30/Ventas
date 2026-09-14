@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agro-negocio"
+dynamic = ["version"]
+description = "Sistema de escritorio para un negocio familiar de fertilizantes agrícolas: ventas, fiados, compras, inventario y reportes."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Andy" }]
+keywords = ["ventas", "inventario", "fiados", "customtkinter", "sqlite"]
+classifiers = [
+    "Environment :: X11 Applications",
+    "Environment :: Win32 (MS Windows)",
+    "Natural Language :: Spanish",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business",
+]
+dependencies = [
+    "customtkinter>=5.2",
+    "tkcalendar>=1.6",
+    "openpyxl>=3.1",
+    "reportlab>=4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+build = ["pyinstaller>=6", "pillow>=10"]
+
+[project.scripts]
+agro-negocio = "main:main"
+
+[tool.setuptools]
+packages = ["agro", "agro.db", "agro.servicios", "agro.ui", "agro.ui.pantallas"]
+py-modules = ["main"]
+
+[tool.setuptools.dynamic]
+version = { attr = "agro.__version__" }

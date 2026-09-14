@@ -4,13 +4,16 @@ import os
 import re
 import shutil
 import sqlite3
+import sys
+import tkinter as tk
 from functools import partial
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
 from agro import __version__
-from agro.config import ENCARGADA_DEFAULT, GEOMETRIA_INICIAL, NOMBRE_APP, RUTA_BD
+from agro import rutas
+from agro.config import ENCARGADA_DEFAULT, GEOMETRIA_INICIAL, NOMBRE_APP
 from agro.db import BaseDatos
 from agro.preferencias import Preferencias
 from agro.registro import log
@@ -45,9 +48,11 @@ NAVEGACION = [
 
 
 class Aplicacion(ctk.CTk):
-    def __init__(self, ruta_db=RUTA_BD):
+    def __init__(self, ruta_db=None):
         super().__init__()
         self.title(f"{NOMBRE_APP} v{__version__}")
+        self._poner_icono()
+        ruta_db = ruta_db or rutas.ruta_bd()
         self.db = BaseDatos(ruta_db)
         self.prefs = Preferencias(ruta_db)
         self.operaciones = ServicioOperaciones(self.db)
@@ -87,6 +92,16 @@ class Aplicacion(ctk.CTk):
             if ancho >= TAMANO_MINIMO[0] and alto >= TAMANO_MINIMO[1]:
                 return guardada
         return GEOMETRIA_INICIAL
+
+    def _poner_icono(self):
+        """Icono de la ventana (assets/). Si falta el archivo o Tk no lo acepta, se sigue sin icono."""
+        try:
+            if sys.platform.startswith("win"):
+                self.iconbitmap(rutas.ruta_recurso(os.path.join("assets", "icono.ico")))
+            self._icono = tk.PhotoImage(file=rutas.ruta_recurso(os.path.join("assets", "icono.png")))
+            self.iconphoto(True, self._icono)
+        except (tk.TclError, OSError) as e:
+            log.warning("No se pudo cargar el icono de la ventana: %s", e)
 
     def cerrar(self):
         try:

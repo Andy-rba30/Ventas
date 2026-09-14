@@ -4,7 +4,15 @@ Aplicación de escritorio (Python + CustomTkinter + SQLite) para administrar un
 negocio familiar de fertilizantes agrícolas: ventas, compras, fiados,
 inventario, contactos y reportes.
 
-## Requisitos
+## Instalar en Windows (sin Python)
+
+Descarga el zip `AgroNegocio-vX.Y.Z-windows.zip` de la última
+[versión publicada](https://github.com/Andy-rba30/Ventas/releases), descomprímelo en cualquier
+carpeta y abre `AgroNegocio.exe`. Los datos se guardan en `%APPDATA%\AgroNegocio` (la ruta exacta
+aparece en Ajustes); si tenías una `negocio_final_stock.db` junto al programa de una versión
+anterior, la primera vez se traslada allí sola y el programa lo avisa.
+
+## Requisitos (para ejecutar desde el código)
 
 - Python 3.10+
 - Tkinter (viene con Python en Windows/macOS; en Linux `sudo apt install python3-tk`)
@@ -32,9 +40,10 @@ python main.py
 
 Ambas corren en GitHub Actions en cada push (Python 3.11 y 3.12).
 
-La base de datos `negocio_final_stock.db` se crea automáticamente en la carpeta
-desde donde se ejecuta el programa, junto con `config.json` (apariencia, tamaño de
-ventana y último respaldo) y `app.log`.
+La base de datos `negocio_final_stock.db` se crea automáticamente en la carpeta de datos
+de la usuaria (`%APPDATA%\AgroNegocio` en Windows, `~/.local/share/agro-negocio` en Linux),
+junto con `config.json` (apariencia, tamaño de ventana, último respaldo y datos del negocio)
+y `app.log`. La variable de entorno `AGRO_DATOS` permite usar otra carpeta (por ejemplo un USB).
 
 Al cerrar el programa se guarda una copia automática en `backups/negocio_AAAAMMDD_HHMMSS.db`
 junto a la base de datos y se conservan las 10 más recientes (las copias previas a una
@@ -69,5 +78,22 @@ migra solo al nuevo esquema (boletas con líneas y pagos). Antes guarda una copi
 `backups/negocio_pre_migracion_v<versión>_<fecha>.db` junto a la base, y conserva la tabla
 antigua como `_legacy_transacciones`. Los detalles quedan en `app.log`.
 
+## Construir el ejecutable y publicar una versión
+
+```bash
+pip install pyinstaller
+pyinstaller agro.spec --noconfirm      # -> dist/AgroNegocio/
+```
+
+Para publicar: sube la versión en `agro/__init__.py`, anota los cambios en
+[CHANGELOG.md](CHANGELOG.md) y crea el tag:
+
+```bash
+git tag v4.2.0 && git push origin v4.2.0
+```
+
+El workflow `Release Windows` construye el ejecutable en Windows, comprueba que arranca y
+adjunta el zip al Release de GitHub.
+
 Consulta [PLAN_MEJORA.md](PLAN_MEJORA.md) para el plan de refactorización y
-mejora de la interfaz.
+mejora de la interfaz, y [CHANGELOG.md](CHANGELOG.md) para el historial de cambios.
