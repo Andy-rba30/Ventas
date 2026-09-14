@@ -2,7 +2,7 @@
 import os
 import shutil
 import sqlite3
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, simpledialog
 
 import customtkinter as ctk
 
@@ -12,12 +12,15 @@ from agro.db import BaseDatos
 from agro.registro import log
 from agro.servicios.operaciones import ServicioOperaciones
 from agro.servicios.reportes import ServicioReportes
+from agro.ui import tema
+from agro.ui.componentes import Toast, boton_alerta, boton_exito, boton_peligro, boton_primario
 from agro.ui.pantallas.compras import PantallaCompras
 from agro.ui.pantallas.contactos import PantallaContactos
 from agro.ui.pantallas.fiados import PantallaFiados
 from agro.ui.pantallas.inventario import PantallaInventario
 from agro.ui.pantallas.reportes import PantallaReportes
 from agro.ui.pantallas.ventas import PantallaVentas
+from agro.ui.tema import COLOR, ESPACIO, fuente
 
 
 class Aplicacion(ctk.CTk):
@@ -28,16 +31,13 @@ class Aplicacion(ctk.CTk):
         self.db = BaseDatos(ruta_db)
         self.operaciones = ServicioOperaciones(self.db)
         self.reportes = ServicioReportes(self.db)
+        self.toast = Toast(self)
         # Los errores dentro de callbacks de Tk no llegan a la consola en el .exe: van al log y a un aviso.
         self.report_callback_exception = self._error_no_controlado
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
-
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure("Treeview", font=("Segoe UI", 10), rowheight=30, background="#FFFFFF", fieldbackground="#FFFFFF")
-        style.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background="#E0E0E0")
+        tema.aplicar_estilo_treeview()
 
         self._crear_sidebar()
         self._crear_pantallas()
@@ -56,29 +56,30 @@ class Aplicacion(ctk.CTk):
         sb.grid(row=0, column=0, sticky="nsew")
         sb.grid_rowconfigure(8, weight=1)
         self.sidebar_frame = sb
+        m, l = ESPACIO["m"], ESPACIO["l"]
 
-        ctk.CTkLabel(sb, text="Agro-Negocio", font=ctk.CTkFont(size=22, weight="bold"), text_color="#1F6AA5").grid(row=0, column=0, padx=20, pady=(30, 20))
+        ctk.CTkLabel(sb, text="Agro-Negocio", font=fuente("marca"), text_color=COLOR["primario"]).grid(row=0, column=0, padx=m + 4, pady=(ESPACIO["xl"] - 2, m + 4))
 
-        ctk.CTkLabel(sb, text="Encargada:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=1, column=0, padx=20, pady=(10, 0), sticky="w")
+        ctk.CTkLabel(sb, text="Encargada:", font=fuente("cuerpo_negrita")).grid(row=1, column=0, padx=m + 4, pady=(ESPACIO["s"] + 2, 0), sticky="w")
         self.combo_encargada = ctk.CTkOptionMenu(sb, values=[ENCARGADA_DEFAULT])
-        self.combo_encargada.grid(row=2, column=0, padx=20, pady=(5, 10))
+        self.combo_encargada.grid(row=2, column=0, padx=m + 4, pady=(ESPACIO["xs"] + 1, ESPACIO["s"] + 2))
         self.actualizar_lista_encargadas()
 
         f_enc = ctk.CTkFrame(sb, fg_color="transparent")
-        f_enc.grid(row=3, column=0, padx=20, pady=(0, 15))
-        ctk.CTkButton(f_enc, text="+", width=40, command=self.nueva_encargada).pack(side="left", padx=5)
-        ctk.CTkButton(f_enc, text="🗑", width=40, fg_color="#F44336", hover_color="#D32F2F", command=self.borrar_encargada).pack(side="left", padx=5)
+        f_enc.grid(row=3, column=0, padx=m + 4, pady=(0, m - 1))
+        boton_primario(f_enc, "+", self.nueva_encargada, width=40).pack(side="left", padx=ESPACIO["xs"] + 1)
+        boton_peligro(f_enc, "🗑", self.borrar_encargada, width=40).pack(side="left", padx=ESPACIO["xs"] + 1)
 
         nav = [("🛒 Ventas", "ventas"), ("🚚 Compras", "compras"), ("👥 Contactos", "contactos"),
                ("📒 Fiados", "fiados"), ("📝 Inventario", "productos"), ("📊 Reportes", "reportes")]
         self.botones_nav = {}
         for i, (texto, nombre) in enumerate(nav):
-            btn = ctk.CTkButton(sb, text=texto, font=ctk.CTkFont(size=14), height=40, command=lambda n=nombre: self.mostrar_pantalla(n))
-            btn.grid(row=4 + i, column=0, padx=20, pady=8, sticky="n" if nombre == "productos" else "")
+            btn = boton_primario(sb, texto, lambda n=nombre: self.mostrar_pantalla(n), font=fuente("boton"), height=40)
+            btn.grid(row=4 + i, column=0, padx=m + 4, pady=ESPACIO["s"], sticky="n" if nombre == "productos" else "")
             self.botones_nav[nombre] = btn
 
-        ctk.CTkButton(sb, text="💾 Respaldar BD", fg_color="#4CAF50", hover_color="#388E3C", command=self.respaldar_bd).grid(row=10, column=0, padx=20, pady=(20, 5))
-        ctk.CTkButton(sb, text="📂 Restaurar BD", fg_color="#FF9800", hover_color="#F57C00", command=self.restaurar_bd).grid(row=11, column=0, padx=20, pady=(5, 20))
+        boton_exito(sb, "💾 Respaldar BD", self.respaldar_bd).grid(row=10, column=0, padx=m + 4, pady=(m + 4, ESPACIO["xs"] + 1))
+        boton_alerta(sb, "📂 Restaurar BD", self.restaurar_bd).grid(row=11, column=0, padx=m + 4, pady=(ESPACIO["xs"] + 1, m + 4))
 
     # ------------------------------------------------------------------ pantallas
     def _crear_pantallas(self):

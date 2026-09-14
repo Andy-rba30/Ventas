@@ -8,7 +8,9 @@ from agro.registro import log
 from agro.servicios.formato import cantidad, moneda
 from agro.servicios.operaciones import ErrorOperacion
 from agro.ui import dialogos
+from agro.ui.componentes import boton_info, boton_primario
 from agro.ui.pantallas.movimiento_base import PantallaMovimiento
+from agro.ui.tema import ESPACIO, fuente
 
 
 class PantallaCompras(PantallaMovimiento):
@@ -20,19 +22,20 @@ class PantallaCompras(PantallaMovimiento):
     COL_STOCK = "Stock Actual"
     COL_PUNIT_CARRITO = "Costo U."
     PREFIJO_TOTAL = "TOTAL GASTO: S/."
-    COLOR_TOTAL = "#2196F3"
+    COLOR_TOTAL = "info"
     ACTUALIZA_STOCK_CON_CARRITO = False
 
     def _construir_pie(self, f_acciones):
-        ctk.CTkLabel(f_acciones, text="Proveedor:").pack(anchor="w", padx=20, pady=(15, 0))
+        m = ESPACIO["m"]
+        ctk.CTkLabel(f_acciones, text="Proveedor:").pack(anchor="w", padx=m + 4, pady=(m - 1, 0))
         f_prov = ctk.CTkFrame(f_acciones, fg_color="transparent")
-        f_prov.pack(fill="x", padx=20, pady=5)
+        f_prov.pack(fill="x", padx=m + 4, pady=ESPACIO["xs"] + 1)
         self.combo_proveedor = ctk.CTkOptionMenu(f_prov, values=[])
         self.combo_proveedor.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(f_prov, text="➕", width=35, command=self._nuevo_proveedor).pack(side="right", padx=(5, 0))
+        boton_primario(f_prov, "➕", self._nuevo_proveedor, width=35).pack(side="right", padx=(ESPACIO["xs"] + 1, 0))
 
-        ctk.CTkButton(f_acciones, text="🚚 PROCESAR ENTRADA", fg_color="#2196F3", hover_color="#1976D2", height=40,
-                      font=ctk.CTkFont(weight="bold"), command=self.procesar).pack(fill="x", padx=20, pady=(20, 5))
+        boton_info(f_acciones, "🚚 PROCESAR ENTRADA", self.procesar, height=40,
+                   font=fuente("cuerpo_negrita")).pack(fill="x", padx=m + 4, pady=(m + 4, ESPACIO["xs"] + 1))
 
     def _nuevo_proveedor(self):
         def al_guardar(nombre):
@@ -41,7 +44,7 @@ class PantallaCompras(PantallaMovimiento):
         dialogos.abrir_popup_contacto(self.app, self.app.db, "proveedor", al_guardar)
 
     def _fila_producto(self, p):
-        return (p.nombre, moneda(p.precio_compra), cantidad(p.stock)), ()
+        return {"producto": p.nombre, "precio": moneda(p.precio_compra), "stock": cantidad(p.stock)}, ()
 
     def _precio_para(self, prod, cant):
         costo = simpledialog.askfloat("Costo Compra", f"Precio UNITARIO de compra para {prod.nombre} (S/.):", initialvalue=prod.precio_compra)

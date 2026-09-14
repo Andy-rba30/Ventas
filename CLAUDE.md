@@ -41,7 +41,12 @@ agro/servicios/            lógica de negocio sin Tk
    carrito.py              Carrito / LineaCarrito
    operaciones.py          ServicioOperaciones: venta, fiado, compra, cobro, eliminar
    reportes.py             ServicioReportes: Reporte por periodo (pandas por ahora)
-agro/ui/app.py             Aplicacion: sidebar, navegación, refrescos cruzados
+agro/ui/tema.py            tokens: COLOR (semánticos), ESPACIO, fuente(nombre),
+                           aplicar_estilo_treeview(modo) para claro/oscuro
+agro/ui/componentes.py     Tabla (Treeview+scroll, filas dict, arbol=True), Columna,
+                           Tarjeta, Encabezado, Campo (validación visual), Toast,
+                           boton_primario/info/exito/alerta/fiado/peligro/secundario
+agro/ui/app.py             Aplicacion: sidebar, navegación, refrescos cruzados, app.toast
 agro/ui/dialogos.py        calendario, alta rápida de contacto, historial de cliente
 agro/ui/pantallas/         una pantalla por archivo; Ventas y Compras heredan de
                            movimiento_base.PantallaMovimiento
@@ -61,6 +66,11 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
   o a los repositorios de `agro.db`. Las validaciones de negocio lanzan
   `ErrorOperacion` con el mensaje listo para mostrar.
 - Formato de dinero y cantidades solo con `formato.moneda()` y `formato.cantidad()`.
+- UI: ningún literal hex, `ttk.Treeview`, `ttk.Style` ni `CTkFont(...)` fuera de
+  `agro/ui/tema.py` y `agro/ui/componentes.py`. Colores por token (`COLOR["exito"]`),
+  fuentes con `fuente("subtitulo")`, tablas con `Tabla`, botones con las fábricas
+  `boton_*`. Etiquetas de fila con significado fijo: `"alerta"` (stock bajo, deuda)
+  y `"resaltada"` (cabecera de boleta).
 - Finales de línea LF en todo el paquete.
 - Cambios de esquema: nueva versión en `esquema.VERSION_ESQUEMA` + función de migración
   en `migraciones.py` con copia previa; nunca ALTER a mano sobre la BD real.
@@ -73,5 +83,5 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas (esquema v1 con boletas y pagos).
-Siguiente: Prompt 4.1 (tokens de diseño y componentes base).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 hecho (tokens y componentes).
+Siguiente: Prompt 4.2 (sidebar limpio y pantalla Ajustes).

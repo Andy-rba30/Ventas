@@ -56,7 +56,7 @@ assert db.productos.agregar("FOSFATO", 90.0, 70.0, 3)
 app.refrescar_productos(); app.update()
 
 def t_doble_agregado():
-    seleccionar_primero(ventas.tree_productos)
+    seleccionar_primero(ventas.tabla_productos.tree)
     poner(ventas.ent_cantidad, "1/2"); ventas.agregar_al_carrito(); app.update()
     # segunda vez: la tabla ya se recargó y perdió la selección; antes fallaba con IndexError
     poner(ventas.ent_cantidad, "2"); ventas.agregar_al_carrito(); app.update()
@@ -67,15 +67,15 @@ def t_agregar_tras_buscar():
     poner(ventas.ent_buscar, "fos"); ventas.ent_buscar.event_generate("<KeyRelease>"); app.update()
     poner(ventas.ent_cantidad, "1"); ventas.agregar_al_carrito(); app.update()
     assert len(ventas.carrito) == 3
-    sel = ventas.tree_productos.selection()
-    assert sel and ventas.tree_productos.item(sel[0])['values'][0] == "FOSFATO", sel
+    sel = ventas.tabla_productos.tree.selection()
+    assert sel and ventas.tabla_productos.tree.item(sel[0])['values'][0] == "FOSFATO", sel
 
 def t_stock_mostrado_descuenta_carrito():
-    fila = ventas.tree_productos.item(ventas.tree_productos.get_children()[0])['values']
-    assert float(fila[2]) == 3 - 3.5 and 'bajo_stock' in ventas.tree_productos.item(ventas.tree_productos.get_children()[0])['tags'], fila
+    fila = ventas.tabla_productos.tree.item(ventas.tabla_productos.tree.get_children()[0])['values']
+    assert float(fila[2]) == 3 - 3.5 and 'alerta' in ventas.tabla_productos.tree.item(ventas.tabla_productos.tree.get_children()[0])['tags'], fila
 
 def editar(col, texto, cerrar_con):
-    tree = ventas.tree_carrito
+    tree = ventas.tabla_carrito.tree
     iid = tree.get_children()[0]
     x, y, w, h = tree.bbox(iid, col)
     ev = tk.Event(); ev.x = x + w // 2; ev.y = y + h // 2
@@ -102,12 +102,12 @@ def t_editar_invalido():
 
 def t_quitar():
     n = len(avisos); ventas.quitar_del_carrito(); assert avisos[n:] and avisos[-1][0] == "warn"
-    ventas.tree_carrito.selection_set(ventas.tree_carrito.get_children()[0])
+    ventas.tabla_carrito.tree.selection_set(ventas.tabla_carrito.tree.get_children()[0])
     ventas.quitar_del_carrito()
     assert len(ventas.carrito) == 2
 
 def t_compras_doble():
-    seleccionar_primero(compras.tree_productos)
+    seleccionar_primero(compras.tabla_productos.tree)
     poner(compras.ent_cantidad, "5"); compras.agregar_al_carrito(); app.update()
     poner(compras.ent_cantidad, "5"); compras.agregar_al_carrito(); app.update()
     assert len(compras.carrito) == 2 and compras.carrito[0].precio_unit == 70.0
@@ -130,13 +130,13 @@ def t_finalizar_venta_y_fiado():
     db.contactos.agregar("cliente", "JUAN", "", ""); app.refrescar_contactos(); ventas.combo_cliente.set("JUAN")
     ventas.procesar(fiado=True); app.update()
     assert db.productos.obtener("UREA").stock == 7 and len(db.boletas.deudas_pendientes()) == 1
-    assert len(fiados.tree_fiados.get_children()) == 1  # la pantalla Fiados se refrescó sola
+    assert len(fiados.tabla_fiados.tree.get_children()) == 1  # la pantalla Fiados se refrescó sola
 
 def t_cobrar_deuda_ui():
-    fiados.tree_fiados.selection_set(fiados.tree_fiados.get_children()[0])
+    fiados.tabla_fiados.tree.selection_set(fiados.tabla_fiados.tree.get_children()[0])
     app.combo_encargada.set("Administradora")
     fiados.cobrar_deuda(); app.update()
-    assert db.boletas.deudas_pendientes() == [] and fiados.tree_fiados.get_children() == ()
+    assert db.boletas.deudas_pendientes() == [] and fiados.tabla_fiados.tree.get_children() == ()
     cobro = db.cursor.execute("SELECT e.nombre, g.monto, g.boleta_id FROM pagos g JOIN encargadas e ON e.id=g.encargada_id").fetchone()
     assert cobro[0] == "Administradora" and cobro[1] == 120 and cobro[2] is not None, cobro
 
@@ -150,27 +150,27 @@ def t_compra_ui():
     p = db.productos.obtener("UREA")
     assert compras.carrito.vacio and p.stock == 17 and p.precio_compra == 110.0, p
     # inventario refrescado: la fila de UREA muestra el nuevo stock
-    inv = app.pantallas["productos"].tree_precios
+    inv = app.pantallas["productos"].tabla_precios.tree
     assert any(i['values'][0] == "UREA" and float(i['values'][1]) == 17 for i in map(inv.item, inv.get_children()))
 
 def t_borrar_operacion_ui():
     reportes.generar(); app.update()
     assert "17" in reportes.card_stock_total.cget("text")
     def fila_tipo(tipo):
-        for iid in reportes.tree_mensual.get_children():
-            if str(reportes.tree_mensual.item(iid)["values"][2]).startswith(tipo): return iid
+        for iid in reportes.tabla_mensual.tree.get_children():
+            if str(reportes.tabla_mensual.tree.item(iid)["values"][2]).startswith(tipo): return iid
         raise AssertionError(f"sin fila {tipo}")
-    reportes.tree_mensual.selection_set(fila_tipo("FIADO")); n = len(avisos); reportes.borrar_operacion(); app.update()
+    reportes.tabla_mensual.tree.selection_set(fila_tipo("FIADO")); n = len(avisos); reportes.borrar_operacion(); app.update()
     assert avisos[n:] and "pagos" in avisos[-1][1] and db.cursor.execute("SELECT count(*) FROM boletas WHERE tipo='FIADO'").fetchone()[0] == 1
-    reportes.tree_mensual.selection_set(fila_tipo("COBRO_DEUDA")); reportes.borrar_operacion(); app.update()
+    reportes.tabla_mensual.tree.selection_set(fila_tipo("COBRO_DEUDA")); reportes.borrar_operacion(); app.update()
     assert len(db.boletas.deudas_pendientes()) == 1
-    reportes.tree_mensual.selection_set(fila_tipo("FIADO")); reportes.borrar_operacion(); app.update()
+    reportes.tabla_mensual.tree.selection_set(fila_tipo("FIADO")); reportes.borrar_operacion(); app.update()
     assert db.boletas.deudas_pendientes() == [] and db.productos.obtener("UREA").stock == 18
 
 def t_navegacion_y_contactos():
     app.mostrar_pantalla("contactos"); app.update()
     cont = app.pantallas["contactos"]
-    assert any(cont.tree_clientes.item(i)['values'][1] == "JUAN" for i in cont.tree_clientes.get_children())
+    assert any(cont.tabla_clientes.tree.item(i)['values'][1] == "JUAN" for i in cont.tabla_clientes.tree.get_children())
     poner(cont.ent_prov_nom, "semillas sur"); cont.guardar("proveedor")
     assert "SEMILLAS SUR" in compras.combo_proveedor.cget("values") and "SEMILLAS SUR" in reportes.combo_prov.cget("values")
     app.mostrar_pantalla("ventas")

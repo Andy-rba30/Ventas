@@ -9,7 +9,9 @@ from agro.registro import log
 from agro.servicios.formato import cantidad, moneda
 from agro.servicios.operaciones import ErrorOperacion
 from agro.ui import dialogos
+from agro.ui.componentes import boton_exito, boton_fiado, boton_primario
 from agro.ui.pantallas.movimiento_base import PantallaMovimiento
+from agro.ui.tema import ESPACIO, fuente
 
 
 class PantallaVentas(PantallaMovimiento):
@@ -21,21 +23,22 @@ class PantallaVentas(PantallaMovimiento):
     COL_STOCK = "Stock Disp."
     COL_PUNIT_CARRITO = "P.Unit"
     PREFIJO_TOTAL = "TOTAL: S/."
-    COLOR_TOTAL = "#D32F2F"
+    COLOR_TOTAL = "peligro_hover"
     ACTUALIZA_STOCK_CON_CARRITO = True
 
     def _construir_pie(self, f_acciones):
-        ctk.CTkLabel(f_acciones, text="Cliente:").pack(anchor="w", padx=20, pady=(5, 0))
+        m = ESPACIO["m"]
+        ctk.CTkLabel(f_acciones, text="Cliente:").pack(anchor="w", padx=m + 4, pady=(ESPACIO["xs"] + 1, 0))
         f_cli = ctk.CTkFrame(f_acciones, fg_color="transparent")
-        f_cli.pack(fill="x", padx=20, pady=5)
+        f_cli.pack(fill="x", padx=m + 4, pady=ESPACIO["xs"] + 1)
         self.combo_cliente = ctk.CTkOptionMenu(f_cli, values=[CLIENTE_GENERAL])
         self.combo_cliente.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(f_cli, text="➕", width=35, command=self._nuevo_cliente).pack(side="right", padx=(5, 0))
+        boton_primario(f_cli, "➕", self._nuevo_cliente, width=35).pack(side="right", padx=(ESPACIO["xs"] + 1, 0))
 
-        ctk.CTkButton(f_acciones, text="💰 FINALIZAR VENTA", fg_color="#4CAF50", hover_color="#388E3C", height=40,
-                      font=ctk.CTkFont(weight="bold"), command=lambda: self.procesar(fiado=False)).pack(fill="x", padx=20, pady=(15, 5))
-        ctk.CTkButton(f_acciones, text="📒 FINALIZAR FIADO", fg_color="#FFC107", hover_color="#FFA000", text_color="black", height=40,
-                      font=ctk.CTkFont(weight="bold"), command=lambda: self.procesar(fiado=True)).pack(fill="x", padx=20, pady=5)
+        boton_exito(f_acciones, "💰 FINALIZAR VENTA", lambda: self.procesar(fiado=False), height=40,
+                    font=fuente("cuerpo_negrita")).pack(fill="x", padx=m + 4, pady=(m - 1, ESPACIO["xs"] + 1))
+        boton_fiado(f_acciones, "📒 FINALIZAR FIADO", lambda: self.procesar(fiado=True), height=40,
+                    font=fuente("cuerpo_negrita")).pack(fill="x", padx=m + 4, pady=ESPACIO["xs"] + 1)
 
     def _nuevo_cliente(self):
         def al_guardar(nombre):
@@ -46,8 +49,8 @@ class PantallaVentas(PantallaMovimiento):
     # --- productos: el stock mostrado descuenta lo que ya está en el carrito ---
     def _fila_producto(self, p):
         stock_disp = p.stock - self.carrito.cantidad_de(p.nombre)
-        tags = ('bajo_stock',) if stock_disp <= p.stock_minimo else ('normal',)
-        return (p.nombre, moneda(p.precio_venta), cantidad(stock_disp)), tags
+        tags = ("alerta",) if stock_disp <= p.stock_minimo else ()
+        return {"producto": p.nombre, "precio": moneda(p.precio_venta), "stock": cantidad(stock_disp)}, tags
 
     def _precio_para(self, prod, cant):
         stock_disp = prod.stock - self.carrito.cantidad_de(prod.nombre)

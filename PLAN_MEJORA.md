@@ -96,8 +96,10 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅. Fases 0 a 3
-> completas. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub. Esquema v1
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅.
+> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.2). Tras el 4.1 no queda
+> ningún hex, `ttk.Treeview` ni `CTkFont` fuera de `agro/ui/tema.py` y
+> `agro/ui/componentes.py`; la disposición de las pantallas no cambió todavía. Paquete `agro/`, entrada `main.py`, `ventas.py` es un stub. Esquema v1
 > (boletas + líneas + pagos, productos/contactos por id, PRAGMA user_version) con
 > migración automática desde la tabla plana y copia previa en `backups/`.
 > Pruebas: `pytest` (123 casos en `tests/`) y `scripts/prueba_carrito.py` (UI con
