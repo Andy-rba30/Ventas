@@ -50,9 +50,10 @@ agro/ui/componentes.py     Tabla (Treeview+scroll, filas dict, arbol=True), Colu
 agro/ui/app.py             Aplicacion: sidebar (NAVEGACION), encargada activa, atajos
                            F1-F8/Ctrl+B/Esc, apariencia, respaldo, refrescos cruzados, app.toast
 agro/ui/dialogos.py        calendario, alta rápida de contacto, elegir_opcion, historial de cliente
-agro/ui/pantallas/         una pantalla por archivo (inicio, ventas, compras, fiados, inventario,
-                           contactos, reportes, ajustes); Ventas y Compras heredan de
-                           movimiento_base.PantallaMovimiento
+agro/ui/pantallas/         una pantalla por archivo (inicio, fiados, inventario, contactos,
+                           reportes, ajustes). Ventas y Compras son la misma clase
+                           movimiento.PantallaMovimiento(modo="venta"|"compra"); agregar al
+                           carrito pasa por dialogos.DialogoCantidad (no bloqueante, callback)
 ```
 Protocolo opcional de una pantalla (la app llama lo que exista): `al_mostrar()`,
 `refrescar_productos()`, `refrescar_contactos(clientes, proveedores)`, `refrescar_fiados()`,
@@ -91,5 +92,10 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 - Los archivos `*.db`, `*.db-wal`, `*.db-shm` y `*.log` están en `.gitignore`.
 
 ## Hoja de ruta
-Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1 y 4.2 hechos (tokens, componentes,
-sidebar, Ajustes, Inicio básico, atajos). Siguiente: Prompt 4.3 (Ventas y Compras unificadas).
+Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 3 completas; 4.1, 4.2 y 4.3 hechos (tokens, componentes,
+sidebar, Ajustes, Inicio básico, atajos, Ventas/Compras unificadas). Siguiente: Prompt 4.4
+(Inventario y Contactos en maestro-detalle).
+
+Nota para pruebas de UI headless: una ventana `withdraw()` no recibe teclas sintéticas
+(`event_generate` de F-keys, Supr, KeyRelease); para probar atajos hay que `deiconify()` +
+`focus_force()` antes, o llamar al manejador directamente.

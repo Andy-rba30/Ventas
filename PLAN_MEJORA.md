@@ -96,8 +96,14 @@ No cambies ninguna otra línea de ventas.py.
 
 ## Fase 1 – Bugs críticos (sin tocar el diseño)
 
-> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅.
-> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.3). Tras el 4.1 no queda
+> **Estado:** Prompt 0.1 ✅ · 1.1 ✅ · 1.2 ✅ · 2.1 ✅ · 2.2 ✅ · 3.1 ✅ · 4.1 ✅ · 4.2 ✅ · 4.3 ✅.
+> Fases 0 a 3 completas; Fase 4 en curso (siguiente: 4.4). El 4.3 dejó una sola
+> `PantallaMovimiento(modo)` para Ventas y Compras: encabezado con fecha y
+> cliente/proveedor, buscador con Enter, diálogo de cantidad (precio editable solo en
+> compra), carrito 60/40 con tooltip, un solo botón con el monto (Cobrar / Registrar
+> fiado / Registrar ingreso) deshabilitado con carrito vacío o fiado a PÚBLICO GENERAL,
+> Toast de éxito, y atajos Ctrl+Enter y Supr. Desvío: el botón dice "Registrar fiado"
+> (no "Cobrar") cuando el selector está en Fiado. Pruebas: 130 pytest + 17 de UI. Tras el 4.1 no queda
 > ningún hex, `ttk.Treeview` ni `CTkFont` fuera de `agro/ui/tema.py` y
 > `agro/ui/componentes.py`. El 4.2 dejó el sidebar solo con navegación (Inicio,
 > Ventas, Compras, Fiados, Inventario, Contactos, Reportes, Ajustes), la pantalla

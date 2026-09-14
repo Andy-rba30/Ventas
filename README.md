@@ -36,14 +36,15 @@ desde donde se ejecuta el programa, junto con `config.json` (apariencia, tamaño
 ventana y último respaldo) y `app.log`.
 
 Atajos: F1 a F8 cambian de pantalla en el orden del menú, Ctrl+B enfoca el buscador
-de la pantalla actual y Esc limpia la selección.
+de la pantalla actual, Esc limpia la selección; en Ventas y Compras, Ctrl+Enter cobra
+y Supr quita la línea seleccionada del carrito.
 
 ## Módulos
 
 | Pantalla    | Qué hace |
 |-------------|----------|
-| Ventas      | Carrito de venta con soporte de fracciones (1/2, 0.25), edición de precio/cantidad/subtotal, venta al contado o fiado |
-| Compras     | Ingreso de mercadería por proveedor, actualiza stock y costo de compra |
+| Ventas      | Buscar producto, doble clic o Enter para elegir cantidad (acepta 1/2), carrito editable, un solo botón Cobrar / Registrar fiado con el monto |
+| Compras     | Misma pantalla que Ventas en modo compra: cantidad y costo unitario por línea, actualiza stock y costo de referencia |
 | Contactos   | Alta y baja de clientes y proveedores |
 | Fiados      | Cuentas por cobrar, registro de pagos e historial por cliente |
 | Inventario  | Crear, editar y borrar productos; lista de precios y stock |

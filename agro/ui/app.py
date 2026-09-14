@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import sqlite3
+from functools import partial
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -18,22 +19,21 @@ from agro.servicios.reportes import ServicioReportes
 from agro.ui import dialogos, tema
 from agro.ui.componentes import BotonNavegacion, Tabla, Toast, boton_secundario
 from agro.ui.pantallas.ajustes import PantallaAjustes
-from agro.ui.pantallas.compras import PantallaCompras
 from agro.ui.pantallas.contactos import PantallaContactos
 from agro.ui.pantallas.fiados import PantallaFiados
 from agro.ui.pantallas.inicio import PantallaInicio
 from agro.ui.pantallas.inventario import PantallaInventario
+from agro.ui.pantallas.movimiento import PantallaMovimiento
 from agro.ui.pantallas.reportes import PantallaReportes
-from agro.ui.pantallas.ventas import PantallaVentas
 from agro.ui.tema import COLOR, ESPACIO, fuente
 
 TAMANO_MINIMO = (1024, 680)
 
-# (texto, nombre de pantalla, clase, tecla)
+# (texto, nombre de pantalla, fábrica (master, app) -> pantalla, tecla)
 NAVEGACION = [
     ("Inicio", "inicio", PantallaInicio, "<F1>"),
-    ("Ventas", "ventas", PantallaVentas, "<F2>"),
-    ("Compras", "compras", PantallaCompras, "<F3>"),
+    ("Ventas", "ventas", partial(PantallaMovimiento, modo="venta"), "<F2>"),
+    ("Compras", "compras", partial(PantallaMovimiento, modo="compra"), "<F3>"),
     ("Fiados", "fiados", PantallaFiados, "<F4>"),
     ("Inventario", "productos", PantallaInventario, "<F5>"),
     ("Contactos", "contactos", PantallaContactos, "<F6>"),

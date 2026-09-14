@@ -309,6 +309,49 @@ class Seccion(ctk.CTkFrame):
         self.cuerpo.pack(fill="x", padx=ESPACIO["m"], pady=ESPACIO["m"])
 
 
+# ----------------------------------------------------------------------------- Tooltip
+class Tooltip:
+    """Texto de ayuda que aparece al pasar el ratón sobre un widget."""
+
+    def __init__(self, widget, texto, retardo_ms=500):
+        self.widget = widget
+        self.texto = texto
+        self.retardo_ms = retardo_ms
+        self._ventana = None
+        self._timer = None
+        widget.bind("<Enter>", self._programar, add="+")
+        widget.bind("<Leave>", self._ocultar, add="+")
+        widget.bind("<ButtonPress>", self._ocultar, add="+")
+
+    def _programar(self, event=None):
+        self._cancelar()
+        self._timer = self.widget.after(self.retardo_ms, self._mostrar)
+
+    def _mostrar(self):
+        if self._ventana is not None:
+            return
+        x = self.widget.winfo_rootx() + ESPACIO["m"]
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + ESPACIO["xs"]
+        self._ventana = tk.Toplevel(self.widget)
+        self._ventana.wm_overrideredirect(True)
+        self._ventana.wm_geometry(f"+{x}+{y}")
+        ctk.CTkLabel(self._ventana, text=self.texto, font=fuente("pequeña"), fg_color=COLOR["texto_oscuro"],
+                     text_color="#FFFFFF", corner_radius=ESPACIO["xs"], padx=ESPACIO["s"], pady=ESPACIO["xs"]).pack()
+
+    def _cancelar(self):
+        if self._timer:
+            try: self.widget.after_cancel(self._timer)
+            except (ValueError, tk.TclError): pass
+            self._timer = None
+
+    def _ocultar(self, event=None):
+        self._cancelar()
+        if self._ventana is not None:
+            try: self._ventana.destroy()
+            except tk.TclError: pass
+            self._ventana = None
+
+
 # ----------------------------------------------------------------------------- Toast
 class Toast:
     """Aviso no bloqueante en la esquina inferior derecha de una ventana."""

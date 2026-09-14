@@ -5,8 +5,8 @@ import customtkinter as ctk
 from tkcalendar import Calendar
 
 from agro.servicios.formato import cantidad, moneda
-from agro.ui.componentes import Columna, Tabla, boton_exito, boton_primario, boton_secundario
-from agro.ui.tema import ESPACIO, fuente
+from agro.ui.componentes import Campo, Columna, Tabla, boton_exito, boton_primario, boton_secundario
+from agro.ui.tema import COLOR, ESPACIO, fuente
 
 
 def abrir_calendario_popup(parent, entry_widget):
@@ -75,6 +75,56 @@ def elegir_opcion(parent, titulo, etiqueta, opciones, actual=None):
     top.bind("<Escape>", lambda e: top.destroy())
     parent.wait_window(top)
     return resultado["valor"]
+
+
+class DialogoCantidad(ctk.CTkToplevel):
+    """Pide la cantidad (y el precio unitario, si es editable) para agregar un producto al carrito.
+    No bloquea: al confirmar llama a al_confirmar(cantidad, precio) y se cierra."""
+
+    def __init__(self, parent, producto, precio, unidad, stock_disp, precio_editable, al_confirmar):
+        super().__init__(parent)
+        self.al_confirmar = al_confirmar
+        self.title("Agregar al carrito")
+        self.geometry("340x300")
+        self.resizable(False, False)
+        self.grab_set()
+
+        ctk.CTkLabel(self, text=producto, font=fuente("subtitulo")).pack(pady=(ESPACIO["m"], 0), padx=ESPACIO["m"])
+        color = "peligro_hover" if stock_disp <= 0 else "texto_suave"
+        ctk.CTkLabel(self, text=f"Stock disponible: {cantidad(stock_disp)} {unidad}", font=fuente("cuerpo"),
+                     text_color=COLOR[color]).pack(pady=(0, ESPACIO["s"]))
+
+        self.campo_cantidad = Campo(self, f"Cantidad ({unidad}), acepta fracciones como 1/2:", ancho=280, tipo="cantidad",
+                                    horizontal=False, obligatorio=True)
+        self.campo_cantidad.pack(padx=ESPACIO["m"], pady=(0, ESPACIO["s"]), fill="x")
+        self.campo_precio = Campo(self, "Precio unitario (S/.):", ancho=280, tipo="dinero", horizontal=False, obligatorio=True)
+        self.campo_precio.pack(padx=ESPACIO["m"], pady=(0, ESPACIO["s"]), fill="x")
+        self.campo_precio.set(f"{precio:.2f}")
+        if not precio_editable:
+            self.campo_precio.entry.configure(state="disabled")
+
+        botones = ctk.CTkFrame(self, fg_color="transparent")
+        botones.pack(pady=ESPACIO["m"])
+        boton_primario(botones, "Agregar", self.confirmar, width=130).pack(side="left", padx=ESPACIO["xs"])
+        boton_secundario(botones, "Cancelar", self.destroy, width=130).pack(side="left", padx=ESPACIO["xs"])
+        self.bind("<Return>", lambda e: self.confirmar())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.after(50, self.campo_cantidad.focus)
+
+    def confirmar(self):
+        try:
+            cant = self.campo_cantidad.valor()
+            precio = self.campo_precio.valor()
+        except ValueError:
+            return
+        if cant <= 0:
+            self.campo_cantidad._marcar(False)
+            return
+        if precio < 0:
+            self.campo_precio._marcar(False)
+            return
+        self.destroy()
+        self.al_confirmar(cant, precio)
 
 
 def abrir_historial_cliente(parent, cliente, filas):
