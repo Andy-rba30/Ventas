@@ -1,4 +1,4 @@
-"""Pantalla Ajustes: encargadas, respaldo, apariencia y acerca de."""
+"""Pantalla Ajustes: encargadas, respaldo manual y automático, apariencia y acerca de."""
 import os
 from tkinter import messagebox
 
@@ -6,8 +6,10 @@ import customtkinter as ctk
 
 from agro import __version__
 from agro.config import ENCARGADA_DEFAULT, NOMBRE_APP
+from agro.servicios import respaldos, sistema
+from agro.servicios.formato import tamano_archivo
 from agro.ui.componentes import (Campo, Columna, Encabezado, Seccion, Tabla, boton_alerta, boton_exito,
-                                 boton_peligro, boton_primario)
+                                 boton_peligro, boton_primario, boton_secundario)
 from agro.ui.tema import COLOR, ESPACIO, fuente
 
 APARIENCIAS = {"Claro": "Light", "Oscuro": "Dark", "Sistema": "System"}
@@ -55,6 +57,26 @@ class PantallaAjustes(ctk.CTkFrame):
         boton_exito(botones, "💾 Respaldar ahora", self._respaldar, width=180).pack(side="left", padx=(0, ESPACIO["s"]))
         boton_alerta(botones, "📂 Restaurar copia…", self.app.restaurar_bd, width=180).pack(side="left")
 
+        # --- Respaldos automáticos ---
+        sec = Seccion(self.scroll, "Respaldos automáticos",
+                      f"Cada vez que se cierra el programa se guarda una copia en la carpeta backups/ junto a la base de datos "
+                      f"y se conservan las {respaldos.CONSERVAR} más recientes. Las copias previas a una actualización no se borran. "
+                      "Para restaurar una, selecciónala y confirma; antes se guarda una copia de los datos actuales.")
+        sec.pack(fill="x", pady=(0, m))
+        fila = ctk.CTkFrame(sec.cuerpo, fg_color="transparent")
+        fila.pack(fill="x")
+        self.tabla_respaldos = Tabla(fila, [Columna("fecha", "Fecha", 140, estirar=False), Columna("tipo", "Tipo", 120, estirar=False),
+                                            Columna("tamano", "Tamaño", 90, "e", estirar=False), Columna("nombre", "Archivo", 300),
+                                            Columna("ruta", "", oculta=True)], alto=6)
+        self.tabla_respaldos.pack(side="left", fill="x", expand=True)
+        acciones = ctk.CTkFrame(fila, fg_color="transparent")
+        acciones.pack(side="left", padx=(m, 0), anchor="n")
+        boton_exito(acciones, "💾 Respaldar ahora aquí", self._respaldar_automatico, width=190).pack(anchor="w", pady=(0, ESPACIO["s"]))
+        boton_alerta(acciones, "↩ Restaurar seleccionada", self.restaurar_seleccionado, width=190).pack(anchor="w", pady=(0, ESPACIO["s"]))
+        boton_secundario(acciones, "Abrir carpeta", self._abrir_carpeta, width=190).pack(anchor="w")
+        self.lbl_respaldos = ctk.CTkLabel(sec.cuerpo, text="", font=fuente("cuerpo"), text_color=COLOR["texto_suave"], anchor="w", justify="left")
+        self.lbl_respaldos.pack(fill="x", pady=(ESPACIO["xs"], 0))
+
         # --- Apariencia ---
         sec = Seccion(self.scroll, "Apariencia", "Se guarda en config.json junto a la base de datos.")
         sec.pack(fill="x", pady=(0, m))
@@ -75,8 +97,16 @@ class PantallaAjustes(ctk.CTkFrame):
         ultimo = self.app.prefs.get("ultimo_respaldo")
         self.lbl_ultimo_respaldo.configure(
             text=f"Último respaldo: {ultimo['fecha']}  →  {ultimo['ruta']}" if ultimo else "Último respaldo: todavía no se ha hecho ninguno.")
+        self.refrescar_respaldos()
         self.seg_apariencia.set(_NOMBRE_APARIENCIA.get(self.app.prefs.get("apariencia"), "Claro"))
         self.lbl_acerca.configure(text=f"{NOMBRE_APP}\nVersión {__version__}\nRegistro de actividad: {os.path.join(os.path.dirname(ruta), 'app.log')}")
+
+    def refrescar_respaldos(self):
+        carpeta = respaldos.carpeta_de(self.app.db.db_name)
+        lista = respaldos.listar_respaldos(carpeta)
+        self.tabla_respaldos.cargar({"fecha": r.fecha.strftime("%d/%m/%Y %H:%M"), "tipo": "Automático" if r.automatico else "Otra copia",
+                                     "tamano": tamano_archivo(r.tamano), "nombre": r.nombre, "ruta": r.ruta} for r in lista)
+        self.lbl_respaldos.configure(text=f"Carpeta: {carpeta}" if carpeta else "La base de datos en memoria no se respalda.")
 
     al_mostrar = refrescar
 
@@ -108,6 +138,30 @@ class PantallaAjustes(ctk.CTkFrame):
     def _respaldar(self):
         self.app.respaldar_bd()
         self.refrescar()
+
+    def _respaldar_automatico(self):
+        ruta = self.app.respaldo_automatico()
+        if ruta:
+            self.app.toast.mostrar("Copia guardada en backups/", "exito")
+        else:
+            messagebox.showerror("Error", "No se pudo guardar la copia. Revisa app.log.")
+        self.refrescar()
+
+    def restaurar_seleccionado(self):
+        fila = self.tabla_respaldos.seleccion()
+        if not fila:
+            return messagebox.showwarning("Atención", "Selecciona una copia de la lista.")
+        if self.app.restaurar_desde(str(fila["ruta"])):
+            self.app.toast.mostrar("Datos restaurados desde la copia.", "exito")
+        self.refrescar()
+
+    def _abrir_carpeta(self):
+        carpeta = respaldos.carpeta_de(self.app.db.db_name)
+        if not carpeta:
+            return
+        os.makedirs(carpeta, exist_ok=True)
+        if not sistema.abrir_archivo(carpeta):
+            messagebox.showinfo("Carpeta de respaldos", carpeta)
 
     def _cambiar_apariencia(self, etiqueta):
         self.app.cambiar_apariencia(APARIENCIAS[etiqueta])

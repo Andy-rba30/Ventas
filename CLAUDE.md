@@ -46,7 +46,7 @@ agro/db/                   SQLite. BaseDatos = Conexion + repositorios
                            proveedor, tipo): totales_por_tipo, total_pagos, costo_vendido,
                            movimiento_por_producto, boletas_periodo, pagos_periodo, meses_con_datos
 agro/servicios/            lógica de negocio sin Tk (sin pandas ni matplotlib en todo el paquete)
-   formato.py              moneda(), cantidad(), parse_cantidad(), MESES
+   formato.py              moneda(), cantidad(), parse_cantidad(), tamano_archivo(), MESES
    carrito.py              Carrito / LineaCarrito
    costos.py               costo_promedio() ponderado (función pura)
    operaciones.py          ServicioOperaciones: venta, fiado, compra, cobro, eliminar.
@@ -56,13 +56,19 @@ agro/servicios/            lógica de negocio sin Tk (sin pandas ni matplotlib e
    reportes.py             ServicioReportes: Reporte por periodo sobre db.reportes, resumen_inicio,
                            exportar_excel (delegado a exportar.py)
    exportar.py             Excel con openpyxl (se importa solo al exportar)
+   respaldos.py            respaldar_automatico(db) -> backups/negocio_YYYYMMDD_HHMMSS[_N].db junto a la
+                           BD, rotación (CONSERVAR=10, solo los automáticos), listar_respaldos, carpeta_de
+   sistema.py              abrir_archivo(ruta) con el programa del sistema (startfile / open / xdg-open)
 agro/ui/tema.py            tokens: COLOR (semánticos), ESPACIO, fuente(nombre),
                            aplicar_estilo_treeview(modo) para claro/oscuro
 agro/ui/componentes.py     Tabla (Treeview+scroll, filas dict, arbol=True), Columna,
                            Tarjeta, Encabezado, Campo (validación visual), Toast,
                            boton_primario/info/exito/alerta/fiado/peligro/secundario
 agro/ui/app.py             Aplicacion: sidebar (NAVEGACION), encargada activa, atajos
-                           F1-F8/Ctrl+B/Esc, apariencia, respaldo, refrescos cruzados, app.toast
+                           F1-F8/Ctrl+B/Esc, apariencia, refrescos cruzados, app.toast. Respaldo:
+                           respaldar_bd (manual), respaldo_automatico (al cerrar, nunca bloquea el
+                           cierre), restaurar_bd / restaurar_desde(ruta) (confirma y antes guarda
+                           una copia automática de los datos actuales)
 agro/ui/dialogos.py        calendario, alta rápida de contacto, elegir_opcion, historial de cliente
 agro/ui/pantallas/         una pantalla por archivo (inicio, fiados, inventario, contactos,
                            reportes, ajustes). Ventas y Compras son la misma clase
@@ -121,7 +127,7 @@ o `app.refrescar_reportes()`, y cada pantalla implementa el método que necesite
 ## Hoja de ruta
 Ver `PLAN_MEJORA.md`. Estado: Fases 0 a 4 completas; 5.1 hecho (reportes en SQL, sin pandas ni
 matplotlib; `tests/test_arranque.py` vigila que no vuelvan); 5.2 en curso: costo promedio ponderado
-e historial de precios (esquema v3) hecho; faltan respaldo automático y boleta imprimible.
+e historial de precios (esquema v3) y respaldo automático con rotación hechos; falta la boleta imprimible.
 
 Rendimiento (BD de 20 000 líneas de `scripts/generar_datos_prueba.py`): importar `agro.ui.app`
 665 ms -> 152 ms; `ServicioReportes.generar` de un mes 545 ms -> 24 ms; `resumen_inicio` 31 -> 4 ms.

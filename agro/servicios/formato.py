@@ -39,3 +39,12 @@ def hoy():
 
 def hora_actual():
     return datetime.datetime.now().strftime("%H:%M:%S")
+
+
+def tamano_archivo(bytes_):
+    """Tamaño legible: 850 B, 12.3 KB, 4.0 MB."""
+    bytes_ = float(bytes_ or 0)
+    for unidad in ("B", "KB", "MB", "GB"):
+        if bytes_ < 1024 or unidad == "GB":
+            return f"{bytes_:.0f} {unidad}" if unidad == "B" else f"{bytes_:.1f} {unidad}"
+        bytes_ /= 1024

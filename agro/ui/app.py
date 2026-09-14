@@ -16,6 +16,7 @@ from agro.preferencias import Preferencias
 from agro.registro import log
 from agro.servicios.operaciones import ServicioOperaciones
 from agro.servicios.reportes import ServicioReportes
+from agro.servicios.respaldos import respaldar_automatico
 from agro.ui import dialogos, tema
 from agro.ui.componentes import BotonNavegacion, Tabla, Toast, boton_secundario
 from agro.ui.pantallas.ajustes import PantallaAjustes
@@ -89,9 +90,21 @@ class Aplicacion(ctk.CTk):
     def cerrar(self):
         try:
             self.prefs.set("geometria", self.geometry())
+            self.respaldo_automatico()
         finally:
             self.db.cerrar()
             self.destroy()
+
+    def respaldo_automatico(self):
+        """Copia la BD a backups/ con rotación. Nunca impide cerrar: los fallos van al log."""
+        try:
+            ruta = respaldar_automatico(self.db)
+        except (sqlite3.Error, OSError) as e:
+            log.error("Fallo el respaldo automático: %s", e)
+            return None
+        if ruta:
+            self.prefs.set("ultimo_respaldo", {"fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "ruta": ruta})
+        return ruta
 
     def aplicar_apariencia(self, modo):
         ctk.set_appearance_mode(modo)
@@ -229,19 +242,32 @@ class Aplicacion(ctk.CTk):
 
     def restaurar_bd(self):
         fp = filedialog.askopenfilename(filetypes=[("SQLite DB", "*.db")], title="Selecciona el archivo")
-        if not fp: return
-        if not messagebox.askyesno("⚠️ Advertencia", "Esto reemplazará TODOS los datos actuales.\n¿Continuar?"): return
+        if not fp: return False
+        return self.restaurar_desde(fp)
+
+    def restaurar_desde(self, ruta_copia):
+        """Reemplaza la BD actual por `ruta_copia` tras confirmar. Antes guarda una copia automática de
+        los datos actuales en backups/. Devuelve True si se restauró."""
         ruta_db = self.db.db_name
+        if os.path.abspath(ruta_copia) == os.path.abspath(ruta_db):
+            messagebox.showerror("Error", "Esa es la base de datos en uso, no una copia.")
+            return False
+        if not messagebox.askyesno("⚠️ Advertencia", "Esto reemplazará TODOS los datos actuales por la copia:\n"
+                                                    f"{ruta_copia}\n\n¿Continuar?"):
+            return False
+        restaurada = False
         try:
+            self.respaldo_automatico()  # red de seguridad: los datos actuales quedan en backups/
             self.db.cerrar()
             # Si quedaran archivos WAL de la BD anterior, corromperían la restaurada.
             for sufijo in ("-wal", "-shm"):
                 if os.path.exists(ruta_db + sufijo): os.remove(ruta_db + sufijo)
-            shutil.copy(fp, ruta_db)
-            log.info("BD restaurada desde %s", fp)
+            shutil.copy(ruta_copia, ruta_db)
+            log.info("BD restaurada desde %s", ruta_copia)
             messagebox.showinfo("Éxito", "Base de datos restaurada.")
+            restaurada = True
         except (sqlite3.Error, OSError) as e:
-            log.error("Fallo al restaurar desde %s: %s", fp, e)
+            log.error("Fallo al restaurar desde %s: %s", ruta_copia, e)
             messagebox.showerror("Error", f"Fallo al restaurar: {e}")
         finally:
             self.db = BaseDatos(ruta_db)
@@ -251,5 +277,7 @@ class Aplicacion(ctk.CTk):
             self.refrescar_contactos()
             self.refrescar_productos()
             self.refrescar_fiados()
+            self.refrescar_reportes()
             if self.pantalla_actual == "ajustes":
                 self.pantallas["ajustes"].refrescar()
+        return restaurada

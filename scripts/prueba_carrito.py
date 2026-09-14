@@ -41,7 +41,9 @@ def caso(nombre, fn):
     try:
         fn(); print(f"  OK   {nombre}")
     except Exception as e:
-        fallos.append(nombre); print(f"  FAIL {nombre}: {type(e).__name__}: {e}")
+        import traceback
+        linea = traceback.extract_tb(e.__traceback__)[-1].lineno
+        fallos.append(nombre); print(f"  FAIL {nombre} (línea {linea}): {type(e).__name__}: {e}")
 
 def poner(entry, texto):
     entry.delete(0, tk.END); entry.insert(0, texto)
@@ -370,6 +372,33 @@ def t_navegacion_atajos_y_ajustes():
     assert app.wm_minsize() == (1024, 680)  # CTk sobreescribe minsize() solo como setter
     app.mostrar_pantalla("ventas")
 
+def t_respaldos_automaticos():
+    global db
+    import glob
+    app.mostrar_pantalla("ajustes"); app.update()
+    aj = app.pantallas["ajustes"]
+    assert aj.tabla_respaldos.vacia() and "backups" in aj.lbl_respaldos.cget("text")
+    # respaldar desde Ajustes: aparece en la tabla como automático y actualiza "Último respaldo"
+    n = len(toasts); aj._respaldar_automatico(); app.update()
+    filas = [aj.tabla_respaldos.valores(i) for i in aj.tabla_respaldos.iids()]
+    assert len(filas) == 1 and filas[0]["tipo"] == "Automático" and filas[0]["nombre"].startswith("negocio_"), filas
+    assert toasts[n:] == [("exito", "Copia guardada en backups/")] and "backups" in aj.lbl_ultimo_respaldo.cget("text")
+    copia = filas[0]["ruta"]
+    # restaurar la copia: lo hecho después desaparece y los datos actuales quedan en otra copia (red de seguridad)
+    db.contactos.agregar_encargada("Temporal")
+    aj.tabla_respaldos.seleccionar_iid(aj.tabla_respaldos.iids()[0])
+    assert aj.restaurar_seleccionado() is None and app.db is not db
+    db = app.db
+    assert "Temporal" not in db.contactos.encargadas() and db.productos.obtener("UREA") is not None
+    assert ("info", "Base de datos restaurada.") in avisos and toasts[-1] == ("exito", "Datos restaurados desde la copia.")
+    assert len(glob.glob(os.path.join(workdir, "backups", "negocio_*.db"))) == 2 and copia in glob.glob(os.path.join(workdir, "backups", "*.db"))
+    assert len(aj.tabla_respaldos.iids()) == 2
+    # sin selección avisa; la BD en uso no cuenta como copia
+    aj.tabla_respaldos.deseleccionar(); aj.restaurar_seleccionado()
+    assert avisos[-1][0] == "warn"
+    assert app.restaurar_desde(db.db_name) is False and avisos[-1][0] == "error"
+    app.mostrar_pantalla("ventas")
+
 print("== interfaz ==")
 for nombre, fn in [
     ("columnas de productos y botón deshabilitado con carrito vacío", t_columnas_y_estado_inicial),
@@ -390,8 +419,12 @@ for nombre, fn in [
     ("contactos maestro-detalle: alta, duplicado, notas, deuda y Ver fiados", t_navegacion_y_contactos),
     ("inventario maestro-detalle: alta, edición, desactivar, inactivos, filtro", t_inventario_maestro_detalle),
     ("sidebar activo, atajos F/Ctrl+B/Ctrl+Enter/Esc, Ajustes e Inicio", t_navegacion_atajos_y_ajustes),
+    ("respaldos automáticos en Ajustes: respaldar, listar y restaurar con red de seguridad", t_respaldos_automaticos),
 ]:
     caso(nombre, fn)
-app.destroy()
+app.cerrar()  # también prueba el respaldo automático al cerrar
+import glob  # noqa: E402
+if len(glob.glob(os.path.join(workdir, "backups", "negocio_*.db"))) < 3:
+    fallos.append("respaldo automático al cerrar")
 print("FALLOS:", fallos or "ninguno")
 sys.exit(1 if fallos else 0)

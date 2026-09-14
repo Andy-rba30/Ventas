@@ -36,6 +36,11 @@ La base de datos `negocio_final_stock.db` se crea automáticamente en la carpeta
 desde donde se ejecuta el programa, junto con `config.json` (apariencia, tamaño de
 ventana y último respaldo) y `app.log`.
 
+Al cerrar el programa se guarda una copia automática en `backups/negocio_AAAAMMDD_HHMMSS.db`
+junto a la base de datos y se conservan las 10 más recientes (las copias previas a una
+migración no se borran). Desde Ajustes se puede restaurar cualquiera de ellas; antes de
+reemplazar los datos se guarda una copia más de los actuales.
+
 Atajos: F1 a F8 cambian de pantalla en el orden del menú, Ctrl+B enfoca el buscador
 de la pantalla actual, Esc limpia la selección; en Ventas y Compras, Ctrl+Enter cobra
 y Supr quita la línea seleccionada del carrito.
@@ -51,7 +56,7 @@ y Supr quita la línea seleccionada del carrito.
 | Inventario  | Maestro-detalle: tabla con unidad, stock, mínimo, precios y margen; ficha editable con historial de precios de compra y venta; desactivar/reactivar; ver inactivos |
 | Reportes    | Selector de mes con filtros plegables (día, cliente, proveedor, tipo); pestaña Resumen (caja, compras, margen bruto calculado con el costo vigente en cada venta, por cobrar, movimiento por producto) y pestaña Movimientos (boletas con líneas, exportar Excel, eliminar) |
 | Inicio      | Ventas de hoy, fiados pendientes, productos bajo mínimo, listas de reposición y fiados con más de 30 días, accesos a Nueva venta / Ingreso de mercadería |
-| Ajustes     | Encargadas, respaldo y restauración, apariencia (claro/oscuro/sistema) y versión |
+| Ajustes     | Encargadas, respaldo manual, lista de respaldos automáticos con restauración, apariencia (claro/oscuro/sistema) y versión |
 
 ## Migración de datos (v4.1 → v4.2)
 
