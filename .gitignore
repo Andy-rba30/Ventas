@@ -8,3 +8,7 @@ venv/
 dist/
 build/
 *.spec
+*.db-wal
+*.db-shm
+*.log
+backups/
