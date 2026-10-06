@@ -1,0 +1,86 @@
+name: Release Windows
+
+# Construye el ejecutable en Windows y publica el zip en el Release de la versión de agro/__init__.py.
+# Se dispara de dos formas:
+#   - creando un tag:  git tag v4.2.0 && git push origin v4.2.0  (el tag debe coincidir con la versión)
+#   - a mano desde GitHub: Actions > Release Windows > Run workflow (crea el tag vX.Y.Z si no existe)
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: PyInstaller (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt pyinstaller
+
+      - name: Determinar la versión (y comprobar que coincide con el tag, si lo hay)
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(python -c "import agro; print(agro.__version__)")
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "agro.__version__ es $VERSION pero el tag es $GITHUB_REF_NAME"; exit 1
+          fi
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Versión a publicar: v$VERSION"
+
+      - name: Pruebas de datos y servicios
+        run: pytest
+
+      - name: Construir ejecutable
+        run: pyinstaller agro.spec --noconfirm
+
+      - name: Arranque de humo del ejecutable
+        shell: pwsh
+        run: |
+          $env:AGRO_DATOS = Join-Path $env:RUNNER_TEMP "agro-datos"
+          $p = Start-Process -FilePath "dist\AgroNegocio\AgroNegocio.exe" -PassThru
+          Start-Sleep -Seconds 12
+          if ($p.HasExited) { Write-Error "El ejecutable terminó solo (código $($p.ExitCode))"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          if (-not (Test-Path (Join-Path $env:AGRO_DATOS "negocio_final_stock.db"))) {
+            Write-Error "El ejecutable no creó la base de datos en AGRO_DATOS"; exit 1
+          }
+          Get-Content (Join-Path $env:AGRO_DATOS "app.log")
+
+      - name: Empaquetar zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\AgroNegocio\* -DestinationPath "AgroNegocio-${{ steps.version.outputs.tag }}-windows.zip"
+
+      - name: Guardar el zip como artefacto de la ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgroNegocio-${{ steps.version.outputs.tag }}-windows
+          path: AgroNegocio-*.zip
+
+      - name: Publicar en el Release (crea el tag si no existe)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Agro-Negocio ${{ steps.version.outputs.tag }}
+          files: AgroNegocio-*.zip
+          generate_release_notes: true
+          body: |
+            Ejecutable para Windows (64 bits), no requiere instalar nada.
+            1. Descarga el zip de abajo y descomprímelo en una carpeta (por ejemplo `C:\AgroNegocio`).
+            2. Abre `AgroNegocio.exe`. Si Windows muestra "Windows protegió su PC", pulsa "Más información" y "Ejecutar de todas formas" (solo la primera vez).
+            3. Los datos se guardan en `%APPDATA%\AgroNegocio` (la ruta exacta se ve en Ajustes). Si tenías una `negocio_final_stock.db` de la versión anterior, cópiala junto al .exe antes de abrirlo: se trasladará y migrará sola.
+
+            Detalle de cambios en [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md).

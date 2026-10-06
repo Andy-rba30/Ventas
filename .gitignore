@@ -8,3 +8,11 @@ venv/
 dist/
 build/
 *.spec
+*.db-wal
+*.db-shm
+*.log
+backups/
+boletas/
+config.json
+!agro.spec
+*.egg-info/
