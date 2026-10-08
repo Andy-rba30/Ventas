@@ -1,0 +1,21 @@
+# dependencias
+node_modules/
+# next.js
+.next/
+out/
+next-env.d.ts
+# núcleo de ffmpeg copiado desde node_modules (se regenera en postinstall)
+public/ffmpeg/
+# pruebas
+test-results/
+playwright-report/
+coverage/
+# entorno
+.env
+.env.local
+.env.*.local
+# netlify
+.netlify/
+# sistema
+.DS_Store
+*.log

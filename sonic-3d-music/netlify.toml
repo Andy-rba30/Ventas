@@ -1,0 +1,14 @@
+# Despliegue en Netlify. El runtime oficial de Next.js convierte las rutas /api/* en funciones
+# serverless y sirve el resto como estático/CDN. No hace falta más configuración: conecta el
+# repositorio (o usa `netlify deploy --build --prod`) y define las variables de entorno en
+# Site configuration > Environment variables (ver .env.example).
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--no-audit --no-fund"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

@@ -1,0 +1,12 @@
+services:
+  sonic:
+    build: .
+    image: sonic-3d-music:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
