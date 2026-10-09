@@ -37,6 +37,7 @@ python main.py
 - `tests/`: pruebas pytest de datos y servicios con SQLite en memoria (`pip install -r requirements-dev.txt && pytest`).
 - `scripts/prueba_carrito.py`: prueba de la interfaz sin pantalla (`xvfb-run -a python scripts/prueba_carrito.py`).
 - `scripts/generar_datos_prueba.py`: crea una BD de prueba con miles de boletas para medir rendimiento (nunca la real).
+- `video/`: proyecto [Remotion](https://www.remotion.dev/) creado con `npx create-video@latest` para videos del negocio (`cd video && npm i && npm run dev`). Es independiente de la aplicación Python.
 
 Ambas corren en GitHub Actions en cada push (Python 3.11 y 3.12).
 

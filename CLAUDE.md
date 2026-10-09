@@ -36,6 +36,9 @@ Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 
 main.py                    punto de entrada: carpeta de datos, traslado de BD antigua, Aplicacion
 pyproject.toml / agro.spec metadatos del paquete (versión dinámica) / PyInstaller onedir
 assets/                    icono.png e icono.ico (regenerables con scripts/generar_icono.py)
+video/                     proyecto Remotion (npx create-video, plantilla blank, sin Tailwind) para
+                           videos del negocio; independiente del paquete Python y de su CI.
+                           cd video && npm i && npm run dev (Studio) / npx remotion render
 agro/config.py             constantes (NOMBRE_BD, CLIENTE_GENERAL, umbral de stock...)
 agro/rutas.py              carpeta_datos() por plataforma (o AGRO_DATOS), ruta_bd(), ruta_recurso()
                            para assets empaquetados (sys._MEIPASS), trasladar_datos_antiguos()
