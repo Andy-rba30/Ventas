@@ -36,6 +36,13 @@ Pruebas (sin tocar la BD real; CI en `.github/workflows/tests.yml`, Python 3.11 
 main.py                    punto de entrada: carpeta de datos, traslado de BD antigua, Aplicacion
 pyproject.toml / agro.spec metadatos del paquete (versión dinámica) / PyInstaller onedir
 assets/                    icono.png e icono.ico (regenerables con scripts/generar_icono.py)
+video/                     proyecto Remotion (npx create-video, plantilla blank, sin Tailwind);
+                           independiente del paquete Python y de su CI. src/Root.tsx registra la
+                           composición DerechosNinez (20 s, 1920x1080, 30 fps: TransitionSeries con
+                           fundidos) y, como composiciones conectadas, sus escenas en src/escenas/
+                           (Apertura, Importancia, Derechos con TarjetaDerecho, Cierre; Fondo es
+                           decorativo). Cada escena es Interactive.withSchema con textos y colores
+                           editables en Studio. cd video && npm i && npm run dev / npx remotion render
 agro/config.py             constantes (NOMBRE_BD, CLIENTE_GENERAL, umbral de stock...)
 agro/rutas.py              carpeta_datos() por plataforma (o AGRO_DATOS), ruta_bd(), ruta_recurso()
                            para assets empaquetados (sys._MEIPASS), trasladar_datos_antiguos()
